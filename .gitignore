@@ -56,3 +56,6 @@ lib/l10n/app_localizations*.dart
 *.jks
 *.keystore
 keys/
+
+# Design briefs (local only)
+docs/design/
