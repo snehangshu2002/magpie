@@ -26,6 +26,8 @@ class IntakeScreen extends ConsumerStatefulWidget {
 class _IntakeScreenState extends ConsumerState<IntakeScreen> {
   final _text = TextEditingController();
   final _focus = FocusNode();
+  final _scroll = ScrollController();
+  double _bottomInset = 0;
 
   IntakeController get _controller =>
       ref.read(intakeControllerProvider.notifier);
@@ -34,7 +36,24 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
   void dispose() {
     _text.dispose();
     _focus.dispose();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  /// The Download bar grows when it shows a message. If the list was
+  /// scrolled to its end, keep the end in view rather than under the bar.
+  void _keepEndInView(double bottomInset) {
+    final grew = bottomInset > _bottomInset;
+    _bottomInset = bottomInset;
+    if (!grew || !_scroll.hasClients) return;
+    final position = _scroll.position;
+    final atEnd =
+        position.maxScrollExtent > 0 &&
+        position.pixels >= position.maxScrollExtent - 1;
+    if (!atEnd) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    });
   }
 
   Future<void> _paste() async {
@@ -124,79 +143,79 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
       // Builder: the bottom padding must come from inside the Scaffold, where
       // it includes the Download bar's height.
       body: Builder(
-        builder: (context) => CustomScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          slivers: [
-            SliverAppBar.large(title: Text(l10n.navDownload)),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                0,
-                16,
-                MediaQuery.paddingOf(context).bottom + 24,
-              ),
-              sliver: SliverList.list(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      l10n.intakeHint,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  LinkField(
-                    controller: _text,
-                    focusNode: _focus,
-                    platform: state.detected?.platform,
-                    hasText: state.input.isNotEmpty,
-                    // Nothing to fetch for a playlist (the status explains
-                    // why) or for a link whose formats already show.
-                    canSubmit:
-                        state.detected?.kind != LinkKind.playlist &&
-                        (submitted == null ||
-                            state.detected?.uri != submitted.uri),
-                    onChanged: _controller.edit,
-                    onSubmit: _controller.submit,
-                    onPaste: _paste,
-                    onClear: _controller.clear,
-                  ),
-                  LinkStatus(detected: state.detected, notice: state.notice),
-                  const SizedBox(height: 20),
-                  // Results grow down out of the link box and collapse back
-                  // into it along the same path.
-                  AnimatedSize(
-                    duration: duration,
-                    curve: AppMotion.standard,
-                    alignment: Alignment.topCenter,
-                    child: AnimatedSwitcher(
-                      duration: duration,
-                      switchInCurve: AppMotion.standard,
-                      switchOutCurve: AppMotion.standard,
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween(
-                            begin: const Offset(0, -0.03),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: child,
+        builder: (context) {
+          final bottomInset = MediaQuery.paddingOf(context).bottom;
+          _keepEndInView(bottomInset);
+          return CustomScrollView(
+            controller: _scroll,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              SliverAppBar.large(title: Text(l10n.navDownload)),
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 24),
+                sliver: SliverList.list(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        l10n.intakeHint,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      layoutBuilder: (current, previous) => Stack(
-                        alignment: Alignment.topCenter,
-                        children: [...previous, ?current],
-                      ),
-                      child: results,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    LinkField(
+                      controller: _text,
+                      focusNode: _focus,
+                      platform: state.detected?.platform,
+                      hasText: state.input.isNotEmpty,
+                      // Nothing to fetch for a playlist (the status explains
+                      // why) or for a link whose formats already show.
+                      canSubmit:
+                          state.detected?.kind != LinkKind.playlist &&
+                          (submitted == null ||
+                              state.detected?.uri != submitted.uri),
+                      onChanged: _controller.edit,
+                      onSubmit: _controller.submit,
+                      onPaste: _paste,
+                      onClear: _controller.clear,
+                    ),
+                    LinkStatus(detected: state.detected, notice: state.notice),
+                    const SizedBox(height: 20),
+                    // Results grow down out of the link box and collapse back
+                    // into it along the same path.
+                    AnimatedSize(
+                      duration: duration,
+                      curve: AppMotion.standard,
+                      alignment: Alignment.topCenter,
+                      child: AnimatedSwitcher(
+                        duration: duration,
+                        switchInCurve: AppMotion.standard,
+                        switchOutCurve: AppMotion.standard,
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, -0.03),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        layoutBuilder: (current, previous) => Stack(
+                          alignment: Alignment.topCenter,
+                          children: [...previous, ?current],
+                        ),
+                        child: results,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }

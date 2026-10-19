@@ -4,22 +4,31 @@ import 'package:media_downloader/core/utils/result.dart';
 
 /// Error codes the native side puts in `PlatformException.code`.
 ///
-/// Keep in sync with `EngineErrors` in `YtDlpBridge.kt` and CLAUDE.md.
+/// Keep in sync with `EngineErrors.kt` and CLAUDE.md.
 abstract final class NativeErrorCode {
   static const unsupportedUrl = 'UNSUPPORTED_URL';
   static const network = 'NETWORK';
   static const engine = 'ENGINE';
   static const storage = 'STORAGE';
   static const cancelled = 'CANCELLED';
+  static const notFound = 'NOT_FOUND';
+  static const noApp = 'NO_APP';
 }
 
-Failure failureFromPlatformException(PlatformException e) => switch (e.code) {
-  NativeErrorCode.unsupportedUrl => Failure.unsupportedUrl(detail: e.message),
-  NativeErrorCode.network => Failure.network(detail: e.message),
-  NativeErrorCode.engine => Failure.engine(detail: e.message),
-  NativeErrorCode.storage => Failure.storage(detail: e.message),
+Failure failureFromPlatformException(PlatformException e) =>
+    failureFromNativeCode(e.code, e.message);
+
+/// Maps a native error code, from a [PlatformException] or a `failed`
+/// progress event, to a [Failure].
+Failure failureFromNativeCode(String? code, [String? detail]) => switch (code) {
+  NativeErrorCode.unsupportedUrl => Failure.unsupportedUrl(detail: detail),
+  NativeErrorCode.network => Failure.network(detail: detail),
+  NativeErrorCode.engine => Failure.engine(detail: detail),
+  NativeErrorCode.storage => Failure.storage(detail: detail),
   NativeErrorCode.cancelled => const Failure.cancelled(),
-  _ => Failure.unknown(detail: '${e.code}: ${e.message}'),
+  NativeErrorCode.notFound => Failure.notFound(detail: detail),
+  NativeErrorCode.noApp => Failure.noApp(detail: detail),
+  _ => Failure.unknown(detail: '$code: $detail'),
 };
 
 /// Runs a platform call and converts native errors into a [Result], so

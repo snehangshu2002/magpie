@@ -62,8 +62,8 @@ class DownloadPanel extends ConsumerWidget {
       if (option == selected) return;
       unawaited(HapticFeedback.selectionClick());
       ref.read(selectedDownloadOptionProvider(url).notifier).select(option);
-      // A failure shown for the previous choice no longer applies.
-      ref.invalidate(downloadStarterProvider(url));
+      // A result shown for the previous choice no longer applies.
+      ref.read(downloadStarterProvider(url).notifier).dismiss();
     }
 
     final list = options.of(selected.type);

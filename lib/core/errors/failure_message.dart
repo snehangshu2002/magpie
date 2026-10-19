@@ -8,6 +8,8 @@ extension FailureMessage on Failure {
     EngineFailure() => l10n.failureEngine,
     StorageFailure() => l10n.failureStorage,
     CancelledFailure() => l10n.failureCancelled,
+    NotFoundFailure() => l10n.failureNotFound,
+    NoAppFailure() => l10n.failureNoApp,
     UnavailableFailure() => l10n.failureUnavailable,
     UnknownFailure() => l10n.failureUnknown,
   };

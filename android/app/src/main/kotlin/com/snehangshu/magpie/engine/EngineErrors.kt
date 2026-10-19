@@ -1,7 +1,10 @@
 package com.snehangshu.magpie.engine
 
+import com.snehangshu.magpie.storage.NoAppException
+import com.snehangshu.magpie.storage.StorageException
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
+import java.io.FileNotFoundException
 
 /**
  * Error codes sent to Dart as `PlatformException.code`.
@@ -13,6 +16,8 @@ internal object EngineErrors {
     const val ENGINE = "ENGINE"
     const val STORAGE = "STORAGE"
     const val CANCELLED = "CANCELLED"
+    const val NOT_FOUND = "NOT_FOUND"
+    const val NO_APP = "NO_APP"
     const val UNKNOWN = "UNKNOWN"
 
     data class Error(val code: String, val message: String?)
@@ -29,6 +34,9 @@ internal object EngineErrors {
     fun from(e: Exception): Error = when (e) {
         is YoutubeDL.CanceledException, is InterruptedException -> Error(CANCELLED, e.message)
         is YoutubeDLException -> Error(classify(e.message.orEmpty()), e.message)
+        is StorageException -> Error(STORAGE, e.message)
+        is FileNotFoundException -> Error(NOT_FOUND, e.message)
+        is NoAppException -> Error(NO_APP, e.message)
         else -> Error(UNKNOWN, e.message)
     }
 

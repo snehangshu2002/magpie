@@ -16,6 +16,9 @@ abstract class DownloadRequest with _$DownloadRequest {
 
     /// Relative path under shared storage, e.g. `Download/<AppName>/YouTube`.
     required String targetDir,
+
+    /// Shown in the progress notification.
+    String? title,
   }) = _DownloadRequest;
 
   factory fromJson(Map<String, dynamic> json) =>

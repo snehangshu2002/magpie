@@ -68,6 +68,7 @@ void main() {
         formatId: '18',
         outputType: OutputType.video,
         targetDir: 'Download/App/Generic',
+        title: 'Test video',
       ),
     );
 
@@ -78,6 +79,7 @@ void main() {
       'formatId': '18',
       'outputType': 'video',
       'targetDir': 'Download/App/Generic',
+      'title': 'Test video',
     });
   });
 

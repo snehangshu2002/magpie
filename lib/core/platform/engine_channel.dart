@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:media_downloader/core/platform/channel_json.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/engine_info.dart';
@@ -40,6 +41,18 @@ class EngineChannel {
   Future<bool> cancelDownload(String id) async =>
       await _methods.invokeMethod<bool>('cancelDownload', {'id': id}) ?? false;
 
+  /// Final events of downloads that finished since the last call, including
+  /// those whose live event nobody received. Each is returned once.
+  Future<List<DownloadProgress>> takeFinishedDownloads() async {
+    final reply = await _methods.invokeMethod<List<Object?>>(
+      'takeFinishedDownloads',
+    );
+    return [
+      for (final event in reply ?? const [])
+        DownloadProgress.fromJson(jsonMap(event)),
+    ];
+  }
+
   Future<EngineUpdateResult> updateEngine(EngineReleaseChannel channel) async =>
       EngineUpdateResult.fromJson(
         await _invokeMap('updateEngine', {'channel': channel.name}),
@@ -48,25 +61,13 @@ class EngineChannel {
   /// Progress for all downloads; filter by [DownloadProgress.id].
   late final Stream<DownloadProgress> progress = _progress
       .receiveBroadcastStream()
-      .map((event) => DownloadProgress.fromJson(_jsonMap(event)));
+      .map((event) => DownloadProgress.fromJson(jsonMap(event)));
 
   Future<Map<String, dynamic>> _invokeMap(
     String method, [
     Map<String, Object?>? arguments,
-  ]) async => _jsonMap(await _methods.invokeMethod<Object?>(method, arguments));
+  ]) async => jsonMap(await _methods.invokeMethod<Object?>(method, arguments));
 }
-
-/// Platform channels deliver `Map<Object?, Object?>` at every nesting level,
-/// while generated `fromJson` code expects `Map<String, dynamic>`.
-Map<String, dynamic> _jsonMap(Object? value) => (value! as Map).map(
-  (key, value) => MapEntry(key as String, _jsonValue(value)),
-);
-
-Object? _jsonValue(Object? value) => switch (value) {
-  Map() => _jsonMap(value),
-  List() => value.map(_jsonValue).toList(),
-  _ => value,
-};
 
 @Riverpod(keepAlive: true)
 EngineChannel engineChannel(Ref ref) => EngineChannel();

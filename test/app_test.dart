@@ -5,8 +5,11 @@ import 'package:media_downloader/app.dart';
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
+import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
+
+import 'helpers/fake_library_repository.dart';
 
 class _FakeEngineRepository implements EngineRepository {
   new(this.result);
@@ -25,6 +28,9 @@ void main() {
           overrides: [
             engineRepositoryProvider.overrideWithValue(repository),
             sharedTextProvider.overrideWith((ref) => const Stream.empty()),
+            libraryRepositoryProvider.overrideWithValue(
+              FakeLibraryRepository(),
+            ),
           ],
           child: const App(),
         ),

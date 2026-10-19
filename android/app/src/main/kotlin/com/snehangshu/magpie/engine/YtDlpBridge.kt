@@ -1,7 +1,11 @@
 package com.snehangshu.magpie.engine
 
+import android.Manifest
 import android.content.Context
-import com.yausername.ffmpeg.FFmpeg
+import android.content.pm.PackageManager
+import android.os.Build
+import com.snehangshu.magpie.ActivityHost
+import com.snehangshu.magpie.storage.StorageException
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.mapper.VideoFormat
 import com.yausername.youtubedl_android.mapper.VideoInfo
@@ -15,25 +19,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
  * Native side of the `app/engine` channel contract (see CLAUDE.md).
  * It only executes requests; Dart decides what to run.
  */
-class YtDlpBridge(private val context: Context) :
-    MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
+class YtDlpBridge(
+    private val context: Context,
+    private val host: ActivityHost,
+) : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val initMutex = Mutex()
-    private var initialized = false
 
     private var methodChannel: MethodChannel? = null
     private var progressChannel: EventChannel? = null
 
-    // Receives `app/engine/progress` events once DownloadService is in place.
+    // Receives `app/engine/progress` events while Dart listens.
     private var progressSink: EventChannel.EventSink? = null
 
     fun attach(messenger: BinaryMessenger) {
@@ -42,6 +44,9 @@ class YtDlpBridge(private val context: Context) :
         }
         progressChannel = EventChannel(messenger, PROGRESS_CHANNEL).also {
             it.setStreamHandler(this)
+        }
+        scope.launch {
+            DownloadEvents.events.collect { progressSink?.success(it) }
         }
     }
 
@@ -57,21 +62,39 @@ class YtDlpBridge(private val context: Context) :
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "init" -> respond(result) {
-                ensureInitialized()
+                Engine.ensureInitialized(context)
                 mapOf("ytDlpVersion" to YoutubeDL.getInstance().version(context))
             }
 
             "fetchInfo" -> respond(result) {
-                ensureInitialized()
+                Engine.ensureInitialized(context)
                 YoutubeDL.getInstance().getInfo(call.requireString("url")).toPayload()
             }
 
-            "cancelDownload" -> result.success(
-                YoutubeDL.getInstance().destroyProcessById(call.requireString("id")),
-            )
+            "startDownload" -> respond(result) {
+                val request = DownloadRequest(
+                    id = call.requireString("id"),
+                    url = call.requireString("url"),
+                    formatId = call.requireString("formatId"),
+                    outputType = call.requireString("outputType"),
+                    targetDir = call.requireString("targetDir"),
+                    title = call.argument<String>("title"),
+                )
+                requestDownloadPermissions()
+                withContext(Dispatchers.Main) { DownloadService.start(context, request) }
+                mapOf("id" to request.id)
+            }
+
+            "cancelDownload" -> respond(result) {
+                withContext(Dispatchers.Main) {
+                    DownloadService.cancel(context, call.requireString("id"))
+                }
+            }
+
+            "takeFinishedDownloads" -> respond(result) { DownloadResults.take(context) }
 
             "updateEngine" -> respond(result) {
-                ensureInitialized()
+                Engine.ensureInitialized(context)
                 val channel = when (call.argument<String>("channel")) {
                     "nightly" -> YoutubeDL.UpdateChannel.NIGHTLY
                     else -> YoutubeDL.UpdateChannel.STABLE
@@ -86,7 +109,6 @@ class YtDlpBridge(private val context: Context) :
                 )
             }
 
-            // startDownload arrives together with DownloadService (v1 scope item 3).
             else -> result.notImplemented()
         }
     }
@@ -99,12 +121,27 @@ class YtDlpBridge(private val context: Context) :
         progressSink = null
     }
 
-    /** Unpacks Python, yt-dlp and FFmpeg on first use; later calls return at once. */
-    private suspend fun ensureInitialized() = initMutex.withLock {
-        if (!initialized) {
-            YoutubeDL.getInstance().init(context)
-            FFmpeg.getInstance().init(context)
-            initialized = true
+    /**
+     * Asks for the progress notification (Android 13+; downloads run without
+     * it) and, before Android 10, for write access to shared storage, which
+     * saving cannot do without.
+     */
+    private suspend fun requestDownloadPermissions() {
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }
+        if (wanted.isEmpty()) return
+        host.requestPermissions(wanted)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            throw StorageException("Storage permission denied")
         }
     }
 

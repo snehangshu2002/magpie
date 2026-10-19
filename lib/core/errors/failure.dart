@@ -14,6 +14,12 @@ sealed class Failure with _$Failure implements Exception {
   const factory storage({String? detail}) = StorageFailure;
   const factory cancelled() = CancelledFailure;
 
+  /// A saved file was moved or deleted outside the app.
+  const factory notFound({String? detail}) = NotFoundFailure;
+
+  /// No installed app can open or share the file.
+  const factory noApp({String? detail}) = NoAppFailure;
+
   /// The native side doesn't implement the call yet (e.g. a feature that
   /// hasn't shipped in this build).
   const factory unavailable({String? detail}) = UnavailableFailure;

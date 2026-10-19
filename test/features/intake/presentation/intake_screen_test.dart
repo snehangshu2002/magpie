@@ -6,14 +6,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_downloader/app.dart';
 import 'package:media_downloader/core/errors/failure.dart';
+import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/data/media_repository_impl.dart';
+import 'package:media_downloader/features/download/domain/download_details.dart';
 import 'package:media_downloader/features/download/domain/media_repository.dart';
+import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
+
+import '../../../helpers/fake_library_repository.dart';
 
 // Made-up ids and titles only; no real media.
 const _link = 'https://youtu.be/test123';
@@ -54,6 +59,11 @@ const _clip = MediaInfo(
 class _FakeMediaRepository implements MediaRepository {
   final fetched = <Uri>[];
   final requests = <DownloadRequest>[];
+  final cancelled = <String>[];
+  final progress = StreamController<DownloadProgress>.broadcast();
+
+  /// Returned by [startDownload] instead of the id, when set.
+  Failure? startFailure;
 
   @override
   Future<Result<MediaInfo>> fetchInfo(Uri url) async {
@@ -62,10 +72,37 @@ class _FakeMediaRepository implements MediaRepository {
   }
 
   @override
-  Future<Result<String>> startDownload(DownloadRequest request) async {
+  Future<Result<String>> startDownload(
+    DownloadRequest request,
+    DownloadDetails details,
+  ) async {
     requests.add(request);
-    return const Err(Failure.unavailable());
+    return switch (startFailure) {
+      final failure? => Err(failure),
+      null => Ok(request.id),
+    };
   }
+
+  @override
+  Stream<DownloadProgress> progressOf(String id) =>
+      progress.stream.where((event) => event.id == id);
+
+  @override
+  Future<Result<bool>> cancelDownload(String id) async {
+    cancelled.add(id);
+    return const Ok(true);
+  }
+
+  /// Sends a progress event for the last started download.
+  void emit(DownloadState state, {double percent = 0, String? error}) =>
+      progress.add(
+        DownloadProgress(
+          id: requests.last.id,
+          percent: percent,
+          state: state,
+          error: error,
+        ),
+      );
 }
 
 class _FakeEngineRepository implements EngineRepository {
@@ -95,6 +132,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, null);
     await shared.close();
+    await media.progress.close();
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
@@ -110,6 +148,7 @@ void main() {
           mediaRepositoryProvider.overrideWithValue(media),
           engineRepositoryProvider.overrideWithValue(_FakeEngineRepository()),
           sharedTextProvider.overrideWith((ref) => shared.stream),
+          libraryRepositoryProvider.overrideWithValue(FakeLibraryRepository()),
         ],
         child: const App(),
       ),
@@ -162,20 +201,80 @@ void main() {
     expect(find.text('Download · 3 MB'), findsOneWidget);
   });
 
-  testWidgets('download sends the choice and shows the failure inline', (
+  // The queued state shows a spinner, so these pump a fixed time instead of
+  // settling.
+  Future<void> pumpFor(WidgetTester tester) =>
+      tester.pump(const Duration(seconds: 1));
+
+  testWidgets('download sends the choice and shows its progress', (
     tester,
   ) async {
     await pumpApp(tester);
     await submit(tester, _link);
 
     await tester.tap(find.text('Download · 48 MB'));
-    await tester.pumpAndSettle();
+    await pumpFor(tester);
 
     final request = media.requests.single;
     expect(request.url, _link);
     expect(request.formatId, '137+140');
     expect(request.outputType, OutputType.video);
     expect(request.targetDir, 'Download/Magpie/YouTube');
+    expect(request.title, 'Test clip');
+    expect(find.text('Waiting to start…'), findsOneWidget);
+
+    media.emit(DownloadState.running, percent: 45.6);
+    await pumpFor(tester);
+    expect(find.text('Downloading · 45%'), findsOneWidget);
+
+    media.emit(DownloadState.saved, percent: 100);
+    await tester.pumpAndSettle();
+    expect(find.text('Saved to Download/Magpie/YouTube'), findsOneWidget);
+    expect(find.text('Download · 48 MB'), findsOneWidget);
+  });
+
+  testWidgets('cancel stops the download', (tester) async {
+    await pumpApp(tester);
+    await submit(tester, _link);
+    await tester.tap(find.text('Download · 48 MB'));
+    media.emit(DownloadState.running, percent: 10);
+    await pumpFor(tester);
+
+    await tester.tap(find.byTooltip('Cancel download'));
+    await pumpFor(tester);
+    expect(media.cancelled, [media.requests.single.id]);
+
+    media.emit(DownloadState.cancelled, percent: 10);
+    await tester.pumpAndSettle();
+    expect(find.text('Download · 48 MB'), findsOneWidget);
+    expect(find.textContaining('Saved to'), findsNothing);
+  });
+
+  testWidgets('a failed download explains why', (tester) async {
+    await pumpApp(tester);
+    await submit(tester, _link);
+    await tester.tap(find.text('Download · 48 MB'));
+    await pumpFor(tester);
+
+    media.emit(DownloadState.failed, error: 'NETWORK');
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Network error. Check your connection and try again.'),
+      findsOneWidget,
+    );
+    expect(find.text('Download · 48 MB'), findsOneWidget);
+  });
+
+  testWidgets('a download that cannot start shows the failure inline', (
+    tester,
+  ) async {
+    media.startFailure = const Failure.unavailable();
+    await pumpApp(tester);
+    await submit(tester, _link);
+
+    await tester.tap(find.text('Download · 48 MB'));
+    await tester.pumpAndSettle();
+
     expect(
       find.text("This isn't available in this version yet."),
       findsOneWidget,

@@ -3,7 +3,22 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'download_progress.freezed.dart';
 part 'download_progress.g.dart';
 
-enum DownloadState { queued, running, merging, saved, failed, cancelled }
+enum DownloadState {
+  queued,
+  running,
+
+  /// Merging streams or copying the file into shared storage.
+  merging,
+  saved,
+  failed,
+  cancelled;
+
+  /// Not yet saved, failed or cancelled.
+  bool get isActive => switch (this) {
+    queued || running || merging => true,
+    saved || failed || cancelled => false,
+  };
+}
 
 /// Event on `app/engine/progress`.
 @freezed

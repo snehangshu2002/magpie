@@ -80,5 +80,7 @@ flutter {
 dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+    // NotificationCompat/ServiceCompat for DownloadService; already pulled in by Flutter plugins.
+    implementation("androidx.core:core:1.17.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 }

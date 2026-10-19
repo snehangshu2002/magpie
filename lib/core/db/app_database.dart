@@ -14,8 +14,23 @@ class DownloadRecords extends Table {
   TextColumn get outputType => text()();
   TextColumn get state => text()();
 
+  /// `SourcePlatform.name`.
+  TextColumn get platform => text().nullable()();
+
+  /// Remote thumbnail from yt-dlp; may expire, so the Library prefers one
+  /// made from the saved file.
+  TextColumn get thumbnail => text().nullable()();
+  TextColumn get ext => text().nullable()();
+
+  /// Short side in pixels, for video.
+  IntColumn get quality => integer().nullable()();
+
+  /// Estimated at start, then the real size once saved.
+  IntColumn get sizeBytes => integer().nullable()();
+
   /// MediaStore content URI once saved.
   TextColumn get fileUri => text().nullable()();
+  TextColumn get mimeType => text().nullable()();
   TextColumn get error => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get completedAt => dateTime().nullable()();
@@ -30,7 +45,26 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'media_downloader'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        final t = downloadRecords;
+        for (final column in [
+          t.platform,
+          t.thumbnail,
+          t.ext,
+          t.quality,
+          t.sizeBytes,
+          t.mimeType,
+        ]) {
+          await m.addColumn(t, column);
+        }
+      }
+    },
+  );
 }
 
 @Riverpod(keepAlive: true)

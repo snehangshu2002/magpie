@@ -119,8 +119,34 @@
       "size": {"type": "String"}
     }
   },
-  "downloadStarted": "Download started",
-  "libraryEmpty": "Nothing downloaded yet.",
+  "downloadWaiting": "Waiting to start…",
+  "downloadRunning": "Downloading · {percent}%",
+  "@downloadRunning": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "downloadFinishing": "Finishing up…",
+  "downloadSaved": "Saved to {path}",
+  "@downloadSaved": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "downloadCancel": "Cancel download",
+  "libraryEmpty": "Nothing downloaded yet",
+  "libraryEmptyHint": "Videos, music and photos you download show up here.",
+  "libraryShare": "Share",
+  "libraryDelete": "Delete",
+  "libraryDeleteTitle": "Delete this file?",
+  "libraryDeleteBody": "“{title}” will be removed from this device.",
+  "@libraryDeleteBody": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "libraryDeleted": "Deleted",
+  "cancel": "Cancel",
   "settingsEngineVersion": "yt-dlp version",
   "loading": "Loading…",
   "retry": "Retry",
@@ -129,6 +155,8 @@
   "failureEngine": "The download engine ran into a problem.",
   "failureStorage": "Couldn't save the file.",
   "failureCancelled": "Cancelled.",
+  "failureNotFound": "This file was moved or deleted.",
+  "failureNoApp": "No app on this device can open this file.",
   "failureUnavailable": "This isn't available in this version yet.",
   "failureUnknown": "Something went wrong."
 }
