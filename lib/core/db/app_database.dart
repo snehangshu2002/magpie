@@ -26,7 +26,7 @@ class DownloadRecords extends Table {
 
 @DriftDatabase(tables: [DownloadRecords])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? executor])
+  new([QueryExecutor? executor])
     : super(executor ?? driftDatabase(name: 'media_downloader'));
 
   @override

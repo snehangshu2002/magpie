@@ -8,7 +8,7 @@ enum OutputType { video, audio, image }
 /// Arguments of `startDownload`.
 @freezed
 abstract class DownloadRequest with _$DownloadRequest {
-  const factory DownloadRequest({
+  const factory({
     required String id,
     required String url,
     required String formatId,
@@ -18,6 +18,6 @@ abstract class DownloadRequest with _$DownloadRequest {
     required String targetDir,
   }) = _DownloadRequest;
 
-  factory DownloadRequest.fromJson(Map<String, dynamic> json) =>
+  factory fromJson(Map<String, dynamic> json) =>
       _$DownloadRequestFromJson(json);
 }

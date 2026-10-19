@@ -4,7 +4,7 @@ import 'package:media_downloader/l10n/l10n.dart';
 
 /// Bottom navigation around the top-level branches of the router.
 class AppShell extends StatelessWidget {
-  const AppShell({required this.shell, super.key});
+  const new({required this.shell, super.key});
 
   final StatefulNavigationShell shell;
 

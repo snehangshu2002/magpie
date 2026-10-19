@@ -6,7 +6,7 @@ part 'media_info.g.dart';
 /// Reply to `fetchInfo`.
 @freezed
 abstract class MediaInfo with _$MediaInfo {
-  const factory MediaInfo({
+  const factory({
     required String title,
     required String extractor,
     String? thumbnail,
@@ -16,15 +16,14 @@ abstract class MediaInfo with _$MediaInfo {
     @Default(<MediaFormat>[]) List<MediaFormat> formats,
   }) = _MediaInfo;
 
-  factory MediaInfo.fromJson(Map<String, dynamic> json) =>
-      _$MediaInfoFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$MediaInfoFromJson(json);
 }
 
 /// One entry of `fetchInfo.formats`. Codec fields are `"none"` when the
 /// stream has no video or no audio, as reported by yt-dlp.
 @freezed
 abstract class MediaFormat with _$MediaFormat {
-  const factory MediaFormat({
+  const factory({
     required String formatId,
     required String ext,
     int? width,
@@ -38,6 +37,5 @@ abstract class MediaFormat with _$MediaFormat {
     String? note,
   }) = _MediaFormat;
 
-  factory MediaFormat.fromJson(Map<String, dynamic> json) =>
-      _$MediaFormatFromJson(json);
+  factory fromJson(Map<String, dynamic> json) => _$MediaFormatFromJson(json);
 }

@@ -10,11 +10,9 @@ enum EngineUpdateStatus { done, alreadyUpToDate }
 /// Reply to `updateEngine`.
 @freezed
 abstract class EngineUpdateResult with _$EngineUpdateResult {
-  const factory EngineUpdateResult({
-    required EngineUpdateStatus status,
-    required String version,
-  }) = _EngineUpdateResult;
+  const factory({required EngineUpdateStatus status, required String version}) =
+      _EngineUpdateResult;
 
-  factory EngineUpdateResult.fromJson(Map<String, dynamic> json) =>
+  factory fromJson(Map<String, dynamic> json) =>
       _$EngineUpdateResultFromJson(json);
 }

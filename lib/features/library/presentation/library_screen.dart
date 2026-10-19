@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 class LibraryScreen extends StatelessWidget {
-  const LibraryScreen({super.key});
+  const new({super.key});
 
   @override
   Widget build(BuildContext context) {

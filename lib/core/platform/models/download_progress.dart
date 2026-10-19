@@ -8,7 +8,7 @@ enum DownloadState { queued, running, merging, saved, failed, cancelled }
 /// Event on `app/engine/progress`.
 @freezed
 abstract class DownloadProgress with _$DownloadProgress {
-  const factory DownloadProgress({
+  const factory({
     required String id,
     required double percent,
     required DownloadState state,
@@ -24,6 +24,6 @@ abstract class DownloadProgress with _$DownloadProgress {
     String? error,
   }) = _DownloadProgress;
 
-  factory DownloadProgress.fromJson(Map<String, dynamic> json) =>
+  factory fromJson(Map<String, dynamic> json) =>
       _$DownloadProgressFromJson(json);
 }

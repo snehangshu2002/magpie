@@ -7,7 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 part 'engine_repository_impl.g.dart';
 
 class EngineRepositoryImpl implements EngineRepository {
-  EngineRepositoryImpl(this._channel);
+  new(this._channel);
 
   final EngineChannel _channel;
 

@@ -6,7 +6,7 @@ import 'package:media_downloader/features/settings/presentation/engine_version_p
 import 'package:media_downloader/l10n/l10n.dart';
 
 class App extends ConsumerWidget {
-  const App({super.key});
+  const new({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

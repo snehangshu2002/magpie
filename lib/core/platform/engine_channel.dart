@@ -13,7 +13,7 @@ part 'engine_channel.g.dart';
 /// Methods throw [PlatformException] on native errors; repositories wrap
 /// calls in `guardPlatformCall` to turn them into failures.
 class EngineChannel {
-  EngineChannel({MethodChannel? methods, EventChannel? progress})
+  new({MethodChannel? methods, EventChannel? progress})
     : _methods = methods ?? const MethodChannel(methodChannelName),
       _progress = progress ?? const EventChannel(progressChannelName);
 
