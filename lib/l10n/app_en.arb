@@ -1,0 +1,21 @@
+{
+  "@@locale": "en",
+  "appTitle": "Media Downloader",
+  "@appTitle": {
+    "description": "Placeholder until the app name is decided."
+  },
+  "navDownload": "Download",
+  "navLibrary": "Library",
+  "navSettings": "Settings",
+  "intakeHint": "Share a link to this app or paste one here to download it.",
+  "libraryEmpty": "Nothing downloaded yet.",
+  "settingsEngineVersion": "yt-dlp version",
+  "loading": "Loading…",
+  "retry": "Retry",
+  "failureUnsupportedUrl": "This link isn't supported.",
+  "failureNetwork": "Network error. Check your connection and try again.",
+  "failureEngine": "The download engine ran into a problem.",
+  "failureStorage": "Couldn't save the file.",
+  "failureCancelled": "Cancelled.",
+  "failureUnknown": "Something went wrong."
+}
