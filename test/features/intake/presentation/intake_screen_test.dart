@@ -18,7 +18,9 @@ import 'package:media_downloader/features/download/domain/media_repository.dart'
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/settings_repository_impl.dart';
+import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 
 import '../../../helpers/fake_library_repository.dart';
 import '../../../helpers/fake_settings_repository.dart';
@@ -97,15 +99,20 @@ class _FakeMediaRepository implements MediaRepository {
   }
 
   /// Sends a progress event for the last started download.
-  void emit(DownloadState state, {double percent = 0, String? error}) =>
-      progress.add(
-        DownloadProgress(
-          id: requests.last.id,
-          percent: percent,
-          state: state,
-          error: error,
-        ),
-      );
+  void emit(
+    DownloadState state, {
+    double percent = 0,
+    String? error,
+    String? filePath,
+  }) => progress.add(
+    DownloadProgress(
+      id: requests.last.id,
+      percent: percent,
+      state: state,
+      error: error,
+      filePath: filePath,
+    ),
+  );
 }
 
 class _FakeEngineRepository implements EngineRepository {
@@ -122,11 +129,13 @@ class _FakeEngineRepository implements EngineRepository {
 
 void main() {
   late _FakeMediaRepository media;
+  late FakeLibraryRepository library;
   late StreamController<String> shared;
   String? clipboard;
 
   setUp(() {
     media = _FakeMediaRepository();
+    library = FakeLibraryRepository();
     shared = StreamController<String>();
     clipboard = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -161,7 +170,7 @@ void main() {
           settingsRepositoryProvider.overrideWithValue(
             FakeSettingsRepository(),
           ),
-          libraryRepositoryProvider.overrideWithValue(FakeLibraryRepository()),
+          libraryRepositoryProvider.overrideWithValue(library),
         ],
         child: const App(),
       ),
@@ -238,12 +247,32 @@ void main() {
 
     media.emit(DownloadState.running, percent: 45.6);
     await pumpFor(tester);
-    expect(find.text('Downloading · 45%'), findsOneWidget);
+    expect(find.text('Downloading'), findsOneWidget);
+    expect(find.text('45%'), findsOneWidget);
 
-    media.emit(DownloadState.saved, percent: 100);
+    media.emit(DownloadState.saved, percent: 100, filePath: 'content://f/1');
     await tester.pumpAndSettle();
     expect(find.text('Saved to Download/Magpie/YouTube'), findsOneWidget);
-    expect(find.text('Download · 48 MB'), findsOneWidget);
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+    expect(library.opened, [media.requests.single.id]);
+    expect(find.text('Download again'), findsOneWidget);
+  });
+
+  testWidgets('changing the theme does not fetch the link again', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await submit(tester, _link);
+    expect(media.fetched, hasLength(1));
+
+    await ProviderScope.containerOf(tester.element(find.byType(App)))
+        .read(settingsProvider.notifier)
+        .change((s) => s.copyWith(appearance: AppearanceMode.dark));
+    await tester.pumpAndSettle();
+
+    expect(media.fetched, hasLength(1));
+    expect(find.text('Test clip'), findsOneWidget);
   });
 
   testWidgets('cancel stops the download', (tester) async {
@@ -256,9 +285,11 @@ void main() {
     await tester.tap(find.byTooltip('Cancel download'));
     await pumpFor(tester);
     expect(media.cancelled, [media.requests.single.id]);
+    expect(find.text('Cancelling…'), findsOneWidget);
 
     media.emit(DownloadState.cancelled, percent: 10);
     await tester.pumpAndSettle();
+    expect(find.text('Download cancelled'), findsOneWidget);
     expect(find.text('Download · 48 MB'), findsOneWidget);
     expect(find.textContaining('Saved to'), findsNothing);
   });
@@ -289,7 +320,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text("This isn't available in this version yet."),
+      find.text("This isn't available right now. Try again later."),
       findsOneWidget,
     );
   });
@@ -329,5 +360,14 @@ void main() {
 
     expect(find.textContaining("Playlists aren't supported"), findsOneWidget);
     expect(media.fetched, isEmpty);
+  });
+
+  testWidgets('text that is not a link gets a quiet hint', (tester) async {
+    await pumpApp(tester);
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pumpAndSettle();
+
+    expect(find.text("Paste a full link, like a video's share link"), findsOne);
+    expect(find.text("That doesn't look like a link."), findsNothing);
   });
 }

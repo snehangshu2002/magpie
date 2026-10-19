@@ -124,16 +124,18 @@ class SettingsScreen extends ConsumerWidget {
                         }
                       },
                     ),
-                    _SettingTile(
-                      title: l10n.settingsPreferAudio,
-                      subtitle: l10n.settingsPreferAudioHint,
-                      trailing: Switch(
-                        value: settings.preferAudioForMusic,
-                        onChanged: (value) => _toggleAudio(controller, value),
-                      ),
-                      onTap: () => _toggleAudio(
-                        controller,
-                        !settings.preferAudioForMusic,
+                    MergeSemantics(
+                      child: _SettingTile(
+                        title: l10n.settingsPreferAudio,
+                        subtitle: l10n.settingsPreferAudioHint,
+                        trailing: Switch(
+                          value: settings.preferAudioForMusic,
+                          onChanged: (value) => _toggleAudio(controller, value),
+                        ),
+                        onTap: () => _toggleAudio(
+                          controller,
+                          !settings.preferAudioForMusic,
+                        ),
                       ),
                     ),
                     _SettingTile(
@@ -231,7 +233,9 @@ class SettingsScreen extends ConsumerWidget {
         SaveFolderPick.cancelled => null,
       };
     } on Failure catch (failure) {
-      messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(failure.message(l10n))));
       return;
     }
     if (message == null) return;
@@ -320,6 +324,7 @@ class _AutoUpdateTile extends ConsumerWidget {
           child: CircularProgressIndicator(
             strokeWidth: 2,
             color: scheme.primary,
+            semanticsLabel: l10n.loading,
           ),
         ),
         AsyncError() => FilledButton(

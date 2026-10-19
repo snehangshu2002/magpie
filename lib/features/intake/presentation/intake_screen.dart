@@ -43,7 +43,7 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
 
   /// The Download bar grows when it shows a message. If the list was
   /// scrolled to its end, keep the end in view rather than under the bar.
-  void _keepEndInView(double bottomInset) {
+  void _keepEndInView(double bottomInset, Duration duration) {
     final grew = bottomInset > _bottomInset;
     _bottomInset = bottomInset;
     if (!grew || !_scroll.hasClients) return;
@@ -53,14 +53,41 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
         position.pixels >= position.maxScrollExtent - 1;
     if (!atEnd) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      if (!_scroll.hasClients) return;
+      final end = _scroll.position.maxScrollExtent;
+      if (duration == Duration.zero) {
+        _scroll.jumpTo(end);
+      } else {
+        _scroll.animateTo(end, duration: duration, curve: AppMotion.standard);
+      }
     });
+  }
+
+  /// Runs a user-initiated [action] and confirms with a light tap when it
+  /// started showing a link. Shared links change state without this.
+  void _commit(void Function() action) {
+    final before = ref.read(intakeControllerProvider).submitted;
+    action();
+    final after = ref.read(intakeControllerProvider).submitted;
+    if (after != null && after != before) {
+      unawaited(HapticFeedback.lightImpact());
+    }
   }
 
   Future<void> _paste() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (mounted) _controller.pasteFromClipboard(data?.text);
+    if (mounted) _commit(() => _controller.pasteFromClipboard(data?.text));
   }
+
+  /// Outgoing children stay in the stack while they fade; they must not
+  /// take taps.
+  static Widget _layout(Widget? current, List<Widget> previous) => Stack(
+    alignment: Alignment.topCenter,
+    children: [
+      for (final child in previous) IgnorePointer(child: child),
+      ?current,
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +114,16 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
         previous,
         next,
       ) {
-        if (next != null && next != previous) {
-          unawaited(HapticFeedback.lightImpact());
+        if (next != null && next != previous && _focus.hasFocus) {
           _focus.unfocus();
+        }
+      })
+      // A link recognized while typing (not set at once by Paste or Share).
+      ..listen(intakeControllerProvider, (previous, next) {
+        if (previous?.detected == null &&
+            next.detected != null &&
+            next.submitted == null) {
+          unawaited(HapticFeedback.selectionClick());
         }
       });
 
@@ -130,9 +164,10 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
         switchOutCurve: AppMotion.standard,
         transitionBuilder: (child, animation) => SizeTransition(
           sizeFactor: animation,
-          alignment: Alignment.topCenter,
+          alignment: Alignment.bottomCenter,
           child: FadeTransition(opacity: animation, child: child),
         ),
+        layoutBuilder: _layout,
         child: ready == null
             ? const SizedBox(width: double.infinity)
             : DownloadBar(
@@ -146,7 +181,7 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
       body: Builder(
         builder: (context) {
           final bottomInset = MediaQuery.paddingOf(context).bottom;
-          _keepEndInView(bottomInset);
+          _keepEndInView(bottomInset, duration);
           return CustomScrollView(
             controller: _scroll,
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -207,12 +242,16 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                           (submitted == null ||
                               state.detected?.uri != submitted.uri),
                       onChanged: _controller.edit,
-                      onSubmit: _controller.submit,
+                      onSubmit: () => _commit(_controller.submit),
                       onPaste: _paste,
                       onClear: _controller.clear,
                     ),
-                    LinkStatus(detected: state.detected, notice: state.notice),
-                    const SizedBox(height: 20),
+                    LinkStatus(
+                      input: state.input,
+                      detected: state.detected,
+                      notice: state.notice,
+                    ),
+                    const SizedBox(height: 8),
                     // Results grow down out of the link box and collapse back
                     // into it along the same path.
                     AnimatedSize(
@@ -233,10 +272,7 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                             child: child,
                           ),
                         ),
-                        layoutBuilder: (current, previous) => Stack(
-                          alignment: Alignment.topCenter,
-                          children: [...previous, ?current],
-                        ),
+                        layoutBuilder: _layout,
                         child: results,
                       ),
                     ),
@@ -270,10 +306,13 @@ class _BrandTitle extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Text(
-          context.l10n.appTitle,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
+        Semantics(
+          header: true,
+          child: Text(
+            context.l10n.appTitle,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],

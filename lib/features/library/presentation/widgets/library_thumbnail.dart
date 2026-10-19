@@ -52,6 +52,8 @@ class LibraryThumbnail extends ConsumerWidget {
         color: scheme.surfaceContainerHighest,
         child: AnimatedSwitcher(
           duration: AppMotion.durationOf(context),
+          switchInCurve: AppMotion.standard,
+          switchOutCurve: AppMotion.standard,
           child: switch (local) {
             AsyncData(value: final bytes?) => Image.memory(
               bytes,
@@ -61,16 +63,27 @@ class LibraryThumbnail extends ConsumerWidget {
               height: double.infinity,
               gaplessPlayback: true,
             ),
-            AsyncLoading() => const SizedBox.expand(),
+            AsyncLoading() => const SizedBox.expand(key: ValueKey('loading')),
             _ when remote != null => Image.network(
               remote,
               key: const ValueKey('remote'),
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
+              frameBuilder: (context, child, frame, sync) => sync
+                  ? child
+                  : AnimatedOpacity(
+                      opacity: frame == null ? 0 : 1,
+                      duration: AppMotion.durationOf(context),
+                      curve: AppMotion.standard,
+                      child: child,
+                    ),
               errorBuilder: (_, _, _) => placeholder,
             ),
-            _ => placeholder,
+            _ => KeyedSubtree(
+              key: const ValueKey('placeholder'),
+              child: placeholder,
+            ),
           },
         ),
       ),

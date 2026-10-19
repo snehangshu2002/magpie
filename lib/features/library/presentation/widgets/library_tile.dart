@@ -9,6 +9,7 @@ import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
+import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/presentation/library_actions.dart';
@@ -58,71 +59,74 @@ class LibraryTile extends ConsumerWidget {
 
     return Semantics(
       selected: selecting ? selected : null,
-      child: Card(
-        color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
-        child: InkWell(
-          onTap: selecting ? toggle : () => _open(context, ref),
-          onLongPress: toggle,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            child: Row(
-              children: [
-                LibraryThumbnail(
-                  type: item.type,
-                  fileUri: item.fileUri,
-                  thumbnailUrl: item.thumbnailUrl,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        details,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ],
+      child: PressableScale(
+        scale: 0.985,
+        child: Card(
+          color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+          child: InkWell(
+            onTap: selecting ? toggle : () => _open(context, ref),
+            onLongPress: toggle,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+              child: Row(
+                children: [
+                  LibraryThumbnail(
+                    type: item.type,
+                    fileUri: item.fileUri,
+                    thumbnailUrl: item.thumbnailUrl,
                   ),
-                ),
-                AnimatedSwitcher(
-                  duration: AppMotion.durationOf(context),
-                  switchInCurve: AppMotion.standard,
-                  child: selecting
-                      ? Padding(
-                          key: const ValueKey('check'),
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            selected
-                                ? Icons.check_circle_rounded
-                                : Icons.radio_button_unchecked_rounded,
-                            color: selected
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
-                        )
-                      : IconButton(
-                          key: const ValueKey('more'),
-                          tooltip: l10n.libraryMore,
-                          icon: const Icon(Icons.more_vert_rounded),
-                          color: scheme.onSurfaceVariant,
-                          onPressed: () => _showActions(context, ref),
                         ),
-                ),
-              ],
+                        const SizedBox(height: 4),
+                        Text(
+                          details,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedSwitcher(
+                    duration: AppMotion.durationOf(context),
+                    switchInCurve: AppMotion.standard,
+                    child: selecting
+                        ? Padding(
+                            key: const ValueKey('check'),
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              selected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                            ),
+                          )
+                        : IconButton(
+                            key: const ValueKey('more'),
+                            tooltip: l10n.libraryMore,
+                            icon: const Icon(Icons.more_vert_rounded),
+                            color: scheme.onSurfaceVariant,
+                            onPressed: () => _showActions(context, ref),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -146,7 +150,9 @@ class LibraryTile extends ConsumerWidget {
         final copied = context.l10n.libraryLinkCopied;
         await Clipboard.setData(ClipboardData(text: item.sourceUrl));
         unawaited(HapticFeedback.lightImpact());
-        messenger.showSnackBar(SnackBar(content: Text(copied)));
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(copied)));
       case _Action.delete:
         await deleteLibraryItems(context, ref, [item]);
     }
@@ -158,7 +164,9 @@ class LibraryTile extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     final result = await ref.read(libraryRepositoryProvider).open(item);
     if (result case Err(:final failure)) {
-      messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(failure.message(l10n))));
     }
   }
 }
@@ -196,7 +204,7 @@ class _ActionSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 8, 16),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
               child: Row(
                 children: [
                   LibraryThumbnail(
@@ -224,16 +232,11 @@ class _ActionSheet extends StatelessWidget {
                           details,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    tooltip: MaterialLocalizations.of(context)
-                        .closeButtonTooltip,
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
@@ -299,52 +302,62 @@ class _ActionTile extends StatelessWidget {
     final scheme = theme.colorScheme;
     final color = destructive ? scheme.error : scheme.onSurface;
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: destructive
-                    ? scheme.errorContainer
-                    : scheme.secondaryContainer,
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: destructive
-                    ? scheme.onErrorContainer
-                    : scheme.onSecondaryContainer,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(color: color),
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: destructive
+                        ? scheme.errorContainer
+                        : scheme.secondaryContainer,
                   ),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: destructive
-                          ? scheme.error
-                          : scheme.onSurfaceVariant,
-                    ),
+                  child: Icon(
+                    icon,
+                    size: 22,
+                    color: destructive
+                        ? scheme.onErrorContainer
+                        : scheme.onSecondaryContainer,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: color,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: destructive
+                              ? scheme.error
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (chevron)
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+              ],
             ),
-            if (chevron)
-              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
-          ],
+          ),
         ),
       ),
     );

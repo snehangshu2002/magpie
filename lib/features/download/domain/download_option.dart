@@ -22,6 +22,9 @@ abstract class DownloadOption with _$DownloadOption {
     /// Estimated bytes; null when unknown.
     int? sizeBytes,
 
+    /// [sizeBytes] leaves out a stream whose size is unknown.
+    @Default(false) bool sizeApproximate,
+
     /// Files saved: more than one for a whole post.
     @Default(1) int count,
   }) = _DownloadOption;

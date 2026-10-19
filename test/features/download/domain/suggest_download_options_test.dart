@@ -69,6 +69,20 @@ void main() {
     expect(uhd.ext, 'webm');
   });
 
+  test('sums a merged size when only the audio size is unknown', () {
+    final options = _suggest([
+      _audio('140'),
+      _video('137', 1080, size: 40000000),
+      _video('136', 720),
+    ]);
+
+    final hd = options.video.first;
+    expect(hd.sizeBytes, 40000000);
+    expect(hd.sizeApproximate, isTrue);
+    expect(options.video.last.sizeBytes, isNull, reason: 'no video size');
+    expect(options.video.last.sizeApproximate, isFalse);
+  });
+
   test('recommends the best video up to 1080p', () {
     final options = _suggest([
       _audio('140'),

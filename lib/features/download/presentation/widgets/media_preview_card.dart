@@ -9,6 +9,7 @@ import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/features/settings/presentation/engine_version_provider.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Thumbnail, title and source of the fetched media.
@@ -57,6 +58,11 @@ class MediaPreviewCard extends StatelessWidget {
                       Image.network(
                         thumbnail,
                         fit: BoxFit.cover,
+                        // Decode at the card's size, not the source's.
+                        cacheWidth:
+                            (MediaQuery.sizeOf(context).width *
+                                    MediaQuery.devicePixelRatioOf(context))
+                                .round(),
                         frameBuilder: (context, child, frame, synchronous) =>
                             synchronous
                             ? child
@@ -67,14 +73,6 @@ class MediaPreviewCard extends StatelessWidget {
                               ),
                         errorBuilder: (_, _, _) => Center(
                           child: PlatformBadge(platform: platform, size: 56),
-                        ),
-                      ),
-                      Positioned(
-                        left: 10,
-                        top: 10,
-                        child: _OverlayPill(
-                          icon: Icons.check_circle_outline_rounded,
-                          text: l10n.previewReady,
                         ),
                       ),
                       if (duration != null)
@@ -101,13 +99,22 @@ class MediaPreviewCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    [
-                      platform.label(l10n),
-                      if (thumbnail == null && duration != null)
-                        formatDuration(duration),
-                      availability,
-                    ].join('  •  '),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: platform.label(l10n)),
+                        if (thumbnail == null && duration != null) ...[
+                          const TextSpan(text: '  •  '),
+                          TextSpan(
+                            text: formatDuration(duration),
+                            style: const TextStyle(
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                        TextSpan(text: '  •  $availability'),
+                      ],
+                    ),
                     style: muted,
                   ),
                 ],
@@ -120,12 +127,12 @@ class MediaPreviewCard extends StatelessWidget {
   }
 }
 
-/// Dark, legible-on-any-image label over the thumbnail.
+/// Dark, legible-on-any-image label over the thumbnail. Black and white on
+/// purpose, not themed: it sits on a photo, not on the surface.
 class _OverlayPill extends StatelessWidget {
-  const new({required this.text, this.icon});
+  const new({required this.text});
 
   final String text;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
@@ -134,14 +141,10 @@ class _OverlayPill extends StatelessWidget {
       color: Colors.black.withValues(alpha: 0.64),
     ),
     child: Padding(
-      padding: EdgeInsets.fromLTRB(icon == null ? 10 : 8, 4, 10, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon case final icon?) ...[
-            Icon(icon, size: 16, color: Colors.white),
-            const SizedBox(width: 6),
-          ],
           Text(
             text,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -170,6 +173,8 @@ class LoadingPreview extends ConsumerWidget {
     // The first lookup after install also unpacks the engine; say so, so a
     // slow first fetch doesn't look stuck.
     final preparing = ref.watch(engineVersionProvider).isLoading;
+    // The lookup also waits (up to 20 s) for the downloader to update.
+    final updating = ref.watch(engineAutoUpdateProvider).isLoading;
 
     return Card(
       color: scheme.surfaceContainer,
@@ -201,7 +206,11 @@ class LoadingPreview extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      preparing ? l10n.preparingEngine : l10n.fetchingFormats,
+                      preparing
+                          ? l10n.preparingEngine
+                          : updating
+                          ? l10n.updatingEngine
+                          : l10n.fetchingFormats,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -210,6 +219,18 @@ class LoadingPreview extends ConsumerWidget {
                 ],
               ),
             ),
+            // Rough shape of the options, so the card doesn't jump on load.
+            for (var i = 0; i < 2; i++)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+                child: DecoratedBox(
+                  decoration: ShapeDecoration(
+                    shape: AppTheme.shape(12),
+                    color: scheme.surfaceContainerHighest,
+                  ),
+                  child: const SizedBox(height: 40),
+                ),
+              ),
           ],
         ),
       ),
@@ -231,6 +252,7 @@ class PreviewError extends StatelessWidget {
     final error = this.error;
 
     return Card(
+      color: theme.colorScheme.surfaceContainer,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
         child: Column(
@@ -245,11 +267,14 @@ class PreviewError extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    error is Failure
-                        ? error.message(l10n)
-                        : l10n.failureUnknown,
-                    style: theme.textTheme.bodyLarge,
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      error is Failure
+                          ? error.message(l10n)
+                          : l10n.failureUnknown,
+                      style: theme.textTheme.bodyLarge,
+                    ),
                   ),
                 ),
               ],

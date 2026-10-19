@@ -20,7 +20,9 @@ Future<bool> shareLibraryItems(
   final messenger = ScaffoldMessenger.of(context);
   final result = await ref.read(libraryRepositoryProvider).share(items);
   if (result case Err(:final failure)) {
-    messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(failure.message(l10n))));
     return false;
   }
   return true;
@@ -67,11 +69,21 @@ Future<bool> deleteLibraryItems(
     case Ok(value: 0):
       break;
     case Ok(value: final count):
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.libraryDeletedCount(count))),
-      );
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              items.length == 1
+                  ? l10n.libraryDeletedItem(items.single.title)
+                  : l10n.libraryDeletedCount(count),
+            ),
+          ),
+        );
     case Err(:final failure):
-      messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(failure.message(l10n))));
   }
   return true;
 }

@@ -186,9 +186,10 @@ DownloadOption _videoOption(
   return base.copyWith(
     formatSelector: '${v.formatId}+${a.formatId}',
     ext: ext,
-    sizeBytes: v.fileSize != null && a.fileSize != null
-        ? v.fileSize! + a.fileSize!
-        : null,
+    // Without the video's size there is nothing to add up; a missing audio
+    // size only makes the total a little low.
+    sizeBytes: v.fileSize == null ? null : v.fileSize! + (a.fileSize ?? 0),
+    sizeApproximate: v.fileSize != null && a.fileSize == null,
   );
 }
 

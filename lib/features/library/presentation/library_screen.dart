@@ -3,8 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:media_downloader/core/errors/failure.dart';
+import 'package:media_downloader/core/errors/failure_message.dart';
 import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
+import 'package:media_downloader/core/router/app_router.dart';
+import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
@@ -41,7 +46,20 @@ class LibraryScreen extends ConsumerWidget {
           hasScrollBody: false,
           child: Center(
             child: items.hasError
-                ? Text(l10n.failureUnknown)
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(switch (items.error) {
+                        final Failure failure => failure.message(l10n),
+                        _ => l10n.failureUnknown,
+                      }, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      FilledButton.tonal(
+                        onPressed: () => ref.invalidate(libraryItemsProvider),
+                        child: Text(l10n.retry),
+                      ),
+                    ],
+                  )
                 : const CircularProgressIndicator(),
           ),
         ),
@@ -68,36 +86,48 @@ class LibraryScreen extends ConsumerWidget {
                   l10n.libraryInProgress,
                   trailing: l10n.libraryActiveCount(active.length),
                 ),
-                for (final download in active) ...[
-                  ActiveDownloadTile(
+                for (final download in active)
+                  _Appear(
                     key: ValueKey(download.id),
-                    download: download,
+                    id: download.id,
+                    child: ActiveDownloadTile(download: download),
                   ),
-                  const SizedBox(height: 10),
-                ],
                 const SizedBox(height: 18),
               ],
               if (shown!.isEmpty && list.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 48),
-                  child: Text(
-                    l10n.libraryNoMatches,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        l10n.libraryNoMatches,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: ref
+                            .read(libraryFilterStateProvider.notifier)
+                            .clear,
+                        child: Text(l10n.libraryClearFilters),
+                      ),
+                    ],
                   ),
                 ),
               for (final (day, group) in _byDay(shown)) ...[
                 SectionLabel(_dayLabel(context, day)),
-                for (final item in group) ...[
-                  LibraryTile(
+                for (final item in group)
+                  _Appear(
                     key: ValueKey(item.id),
-                    item: item,
-                    selecting: selecting,
+                    id: item.id,
+                    // Only files that just finished; the rest are already
+                    // there when the screen opens or scrolls back.
+                    animate:
+                        DateTime.now().difference(item.savedAt) <
+                        const Duration(seconds: 5),
+                    child: LibraryTile(item: item, selecting: selecting),
                   ),
-                  const SizedBox(height: 10),
-                ],
                 const SizedBox(height: 18),
               ],
             ],
@@ -106,11 +136,16 @@ class LibraryScreen extends ConsumerWidget {
       ];
     }
 
-    // Back ends selecting before it leaves the screen.
+    // Back ends selecting, then search, before it leaves the screen.
     return PopScope(
-      canPop: !selecting,
+      canPop: !selecting && !filter.searching,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) ref.read(librarySelectionProvider.notifier).clear();
+        if (didPop) return;
+        if (selecting) {
+          ref.read(librarySelectionProvider.notifier).clear();
+        } else {
+          ref.read(libraryFilterStateProvider.notifier).closeSearch();
+        }
       },
       child: Scaffold(
         body: CustomScrollView(
@@ -234,17 +269,34 @@ class _SelectionBar extends ConsumerWidget {
   }
 }
 
-class _SearchField extends ConsumerWidget {
+class _SearchField extends ConsumerStatefulWidget {
   const new();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends ConsumerState<_SearchField> {
+  final _text = TextEditingController();
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final controller = ref.read(libraryFilterStateProvider.notifier);
+    final hasText = ref.watch(
+      libraryFilterStateProvider.select((f) => f.query?.isNotEmpty ?? false),
+    );
     return Row(
       children: [
         Expanded(
           child: TextField(
+            controller: _text,
             autofocus: true,
             onChanged: controller.search,
             textInputAction: TextInputAction.search,
@@ -254,6 +306,15 @@ class _SearchField extends ConsumerWidget {
             ),
           ),
         ),
+        if (hasText)
+          IconButton(
+            tooltip: l10n.libraryClearSearch,
+            icon: const Icon(Icons.backspace_outlined),
+            onPressed: () {
+              _text.clear();
+              controller.search('');
+            },
+          ),
         IconButton(
           tooltip: l10n.librarySearchClose,
           icon: const Icon(Icons.close_rounded),
@@ -282,13 +343,13 @@ class _Filters extends ConsumerWidget {
         if (platforms.contains(platform)) platform,
     ];
 
-    void select(VoidCallback change) {
-      unawaited(HapticFeedback.selectionClick());
+    void select(VoidCallback change, {bool changes = true}) {
+      if (changes) unawaited(HapticFeedback.selectionClick());
       change();
     }
 
     return SizedBox(
-      height: 56,
+      height: (56 * MediaQuery.textScalerOf(context).scale(1)).clamp(56, 96),
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -296,13 +357,19 @@ class _Filters extends ConsumerWidget {
           _Chip(
             label: l10n.libraryFilterAll,
             selected: filter.type == null,
-            onTap: () => select(() => controller.showType(null)),
+            onTap: () => select(
+              () => controller.showType(null),
+              changes: filter.type != null,
+            ),
           ),
           for (final type in OutputType.values)
             _Chip(
               label: type.label(l10n),
               selected: filter.type == type,
-              onTap: () => select(() => controller.showType(type)),
+              onTap: () => select(
+                () => controller.showType(type),
+                changes: filter.type != type,
+              ),
             ),
           if (sites.length > 1) ...[
             Center(
@@ -310,13 +377,13 @@ class _Filters extends ConsumerWidget {
                 width: 1,
                 height: 24,
                 margin: const EdgeInsets.only(right: 8),
-                color: scheme.outlineVariant,
+                color: scheme.outlineVariant.withValues(alpha: 0.6),
               ),
             ),
             for (final site in sites)
               _Chip(
                 label: site.label(l10n),
-                avatar: Icon(site.icon, color: site.brandColor),
+                avatar: PlatformBadge(platform: site, size: 22),
                 selected: filter.platform == site,
                 onTap: () => select(() => controller.toggleSite(site)),
               ),
@@ -408,8 +475,55 @@ class _EmptyLibrary extends StatelessWidget {
               color: scheme.onSurfaceVariant,
             ),
           ),
+          const SizedBox(height: 20),
+          FilledButton.tonal(
+            onPressed: () => context.go(AppRoutes.intake),
+            child: Text(l10n.libraryEmptyAction),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// Fades and grows its child in the first time [id] is built, so a finished
+/// download or a new file doesn't pop into the list. Removal is not animated.
+class _Appear extends StatefulWidget {
+  const new({
+    required this.id,
+    required this.child,
+    this.animate = true,
+    super.key,
+  });
+
+  final String id;
+  final Widget child;
+  final bool animate;
+
+  // Scrolling rebuilds off-screen rows; only a first appearance animates.
+  static final _seen = <String>{};
+
+  @override
+  State<_Appear> createState() => _AppearState();
+}
+
+class _AppearState extends State<_Appear> {
+  late final bool _animate = widget.animate && _Appear._seen.add(widget.id);
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Column(children: [widget.child, const SizedBox(height: 10)]);
+    if (!_animate) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: AppMotion.durationOf(context),
+      curve: AppMotion.standard,
+      builder: (context, value, child) => Align(
+        alignment: Alignment.topCenter,
+        heightFactor: value.clamp(0, 1),
+        child: Opacity(opacity: value.clamp(0, 1), child: child),
+      ),
+      child: child,
     );
   }
 }

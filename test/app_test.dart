@@ -11,6 +11,8 @@ import 'package:media_downloader/features/settings/data/engine_repository_impl.d
 import 'package:media_downloader/features/settings/data/settings_repository_impl.dart';
 import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
+import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
+import 'package:media_downloader/features/updater/domain/app_update.dart';
 
 import 'helpers/fake_library_repository.dart';
 import 'helpers/fake_settings_repository.dart';
@@ -37,11 +39,28 @@ class _FakeEngineRepository implements EngineRepository {
   }
 }
 
+class _FakeUpdateRepository implements UpdateRepository {
+  new([this.update]);
+
+  final AppUpdate? update;
+  final downloads = <AppUpdate>[];
+
+  @override
+  Future<Result<AppUpdate?>> check() async => Ok(update);
+
+  @override
+  Future<Result<void>> download(AppUpdate update) async {
+    downloads.add(update);
+    return const Ok(null);
+  }
+}
+
 void main() {
   Future<void> pumpApp(
     WidgetTester tester, {
     EngineRepository? engine,
     FakeSettingsRepository? settings,
+    UpdateRepository? updates,
   }) => tester.pumpWidget(
     ProviderScope(
       retry: (_, _) => null,
@@ -54,6 +73,9 @@ void main() {
           settings ?? FakeSettingsRepository(),
         ),
         libraryRepositoryProvider.overrideWithValue(FakeLibraryRepository()),
+        updateRepositoryProvider.overrideWithValue(
+          updates ?? _FakeUpdateRepository(),
+        ),
       ],
       child: const App(),
     ),
@@ -78,6 +100,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(engine.updates, [EngineReleaseChannel.stable]);
+  });
+
+  testWidgets('a newer release is offered for download', (tester) async {
+    const update = AppUpdate(version: '1.2.0', url: 'https://example.com/a');
+    final updates = _FakeUpdateRepository(update);
+    await pumpApp(tester, updates: updates);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Update available'), findsOneWidget);
+    await tester.tap(find.text('Download now'));
+    await tester.pumpAndSettle();
+
+    expect(updates.downloads, [update]);
+    expect(find.text('Update available'), findsNothing);
   });
 
   testWidgets('settings says updates are automatic, in plain words', (
@@ -119,7 +155,7 @@ void main() {
     await pumpApp(tester, settings: settings);
     await openSettings(tester);
 
-    expect(find.text('Same as phone'), findsOneWidget);
+    expect(find.text('Same as phone'), findsNWidgets(2));
     await tapSetting(tester, 'Theme');
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();

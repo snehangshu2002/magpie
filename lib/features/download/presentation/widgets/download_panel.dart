@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
+import 'package:media_downloader/core/router/app_router.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
+import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
@@ -45,6 +48,15 @@ extension RecommendationReasonText on RecommendationReason {
   };
 }
 
+extension DownloadOptionSizeText on DownloadOption {
+  /// "48 MB", "~48 MB" when a stream's size is missing; null when unknown.
+  String? sizeText(AppLocalizations l10n) {
+    final size = sizeBytes;
+    if (size == null) return null;
+    return '${sizeApproximate ? '~' : ''}${formatByteSize(size, l10n)}';
+  }
+}
+
 extension DownloadOptionPostLabel on DownloadOption {
   /// "19 photos" for an option that saves a whole post; null otherwise.
   String? postLabel(AppLocalizations l10n) => count == 1
@@ -78,8 +90,14 @@ class DownloadPanel extends ConsumerWidget {
       settingsProvider.select((s) => s.value?.saveFolder ?? defaultSaveFolder),
     );
 
+    // The choice is fixed while a download runs.
+    final locked = ref.watch(
+      downloadStarterProvider(url)
+          .select((s) => s.isLoading || (s.value?.state.isActive ?? false)),
+    );
+
     void select(DownloadOption option) {
-      if (option == selected) return;
+      if (locked || option == selected) return;
       unawaited(HapticFeedback.selectionClick());
       ref.read(selectedDownloadOptionProvider(url).notifier).select(option);
       // A result shown for the previous choice no longer applies.
@@ -114,10 +132,15 @@ class DownloadPanel extends ConsumerWidget {
         ),
         const SizedBox(height: 10),
         if (options.types.length > 1) ...[
-          _TypePicker(
-            types: options.types,
-            selected: selected.type,
-            onSelected: (type) => select(options.defaultFor(type)),
+          _Dimmed(
+            dimmed: locked,
+            child: _TypePicker(
+              types: options.types,
+              selected: selected.type,
+              onSelected: locked
+                  ? null
+                  : (type) => select(options.defaultFor(type)),
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -128,30 +151,33 @@ class DownloadPanel extends ConsumerWidget {
           trailing: ext == null ? null : l10n.containerLabel(ext),
         ),
         const SizedBox(height: 10),
-        Card(
-          color: scheme.surfaceContainer,
-          child: AnimatedSize(
-            duration: duration,
-            curve: AppMotion.standard,
-            alignment: Alignment.topCenter,
-            child: Column(
-              children: [
-                for (final (i, option) in visible.indexed) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: scheme.outlineVariant.withValues(alpha: 0.5),
+        _Dimmed(
+          dimmed: locked,
+          child: Card(
+            color: scheme.surfaceContainer,
+            child: AnimatedSize(
+              duration: duration,
+              curve: AppMotion.standard,
+              alignment: Alignment.topCenter,
+              child: Column(
+                children: [
+                  for (final (i, option) in visible.indexed) ...[
+                    if (i > 0)
+                      Divider(
+                        height: 1,
+                        color: scheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                    _OptionTile(
+                      option: option,
+                      selected: option == selected,
+                      reason: option == options.recommended
+                          ? options.reason.text(l10n, options.maxQuality)
+                          : null,
+                      onTap: locked ? null : () => select(option),
                     ),
-                  _OptionTile(
-                    option: option,
-                    selected: option == selected,
-                    reason: option == options.recommended
-                        ? options.reason.text(l10n, options.maxQuality)
-                        : null,
-                    onTap: () => select(option),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -179,10 +205,27 @@ class DownloadPanel extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: 16),
+        SectionLabel(l10n.saveDestination),
         _SaveDestination(path: saveDirFor(saveFolder, preview.platform)),
       ],
     );
   }
+}
+
+/// Fades [child] while it can't be changed.
+class _Dimmed extends StatelessWidget {
+  const new({required this.dimmed, required this.child});
+
+  final bool dimmed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+    opacity: dimmed ? 0.5 : 1,
+    duration: AppMotion.durationOf(context),
+    curve: AppMotion.standard,
+    child: child,
+  );
 }
 
 /// A muted section title with an optional sage note at the end.
@@ -232,7 +275,7 @@ class _TypePicker extends StatelessWidget {
 
   final List<OutputType> types;
   final OutputType selected;
-  final ValueChanged<OutputType> onSelected;
+  final ValueChanged<OutputType>? onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -251,12 +294,10 @@ class _TypePicker extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: SizedBox(
-          height: 48,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              AnimatedAlign(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AnimatedAlign(
                 duration: duration,
                 curve: AppMotion.standard,
                 alignment: AlignmentDirectional(
@@ -274,7 +315,11 @@ class _TypePicker extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned.fill(
+            ),
+            // A minimum, so large text grows the pill instead of clipping.
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
+              child: IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -284,14 +329,16 @@ class _TypePicker extends StatelessWidget {
                           icon: type.icon,
                           label: type.label(l10n),
                           selected: type == selected,
-                          onTap: () => onSelected(type),
+                          onTap: onSelected == null
+                              ? null
+                              : () => onSelected!(type),
                         ),
                       ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -309,7 +356,7 @@ class _TypeSegment extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -322,6 +369,7 @@ class _TypeSegment extends StatelessWidget {
       selected: selected,
       inMutuallyExclusiveGroup: true,
       button: true,
+      enabled: onTap != null,
       child: InkWell(
         onTap: onTap,
         customBorder: const StadiumBorder(),
@@ -332,16 +380,21 @@ class _TypeSegment extends StatelessWidget {
           builder: (context, color, _) => Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 8),
+              // Big text needs the room more than the icon does.
+              if (MediaQuery.textScalerOf(context).scale(1) <= 1.3) ...[
+                Icon(icon, size: 20, color: color),
+                const SizedBox(width: 8),
+              ],
               Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: color,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: color,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
@@ -366,7 +419,7 @@ class _OptionTile extends StatelessWidget {
 
   /// Set on the recommended option: why it was picked.
   final String? reason;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -376,24 +429,26 @@ class _OptionTile extends StatelessWidget {
     final ext = option.ext?.toUpperCase();
     final quality = option.quality;
     final fps = option.fps;
-    final size = option.sizeBytes;
+    final size = option.sizeText(l10n);
     const tabular = [FontFeature.tabularFigures()];
 
     final title = switch (option.type) {
       _ when option.count > 1 => option.postLabel(l10n)!,
       OutputType.video when quality != null => l10n.qualityLabel(quality),
+      OutputType.audio => option.type.label(l10n),
       _ => ext ?? option.type.label(l10n),
     };
     final details = [
       if (option.type == OutputType.video && fps != null) l10n.fpsLabel(fps),
-      if (option.type == OutputType.video && ext != null) ext,
+      if (option.type != OutputType.image && ext != null) ext,
       ?reason,
     ].join(' · ');
 
     return Semantics(
-      selected: selected,
+      checked: selected,
       inMutuallyExclusiveGroup: true,
       button: true,
+      enabled: onTap != null,
       child: Material(
         color: selected ? scheme.surfaceContainerHigh : Colors.transparent,
         child: InkWell(
@@ -402,7 +457,7 @@ class _OptionTile extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             child: Row(
               children: [
-                _SelectionMark(selected: selected),
+                ExcludeSemantics(child: _SelectionMark(selected: selected)),
                 const SizedBox(width: 18),
                 Expanded(
                   child: Column(
@@ -435,17 +490,19 @@ class _OptionTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  size == null ? l10n.sizeUnknown : formatByteSize(size, l10n),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: selected
-                        ? scheme.onSurface
-                        : scheme.onSurfaceVariant,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                    fontFeatures: tabular,
+                if (size != null) ...[
+                  const SizedBox(width: 12),
+                  Text(
+                    size,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: selected
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      fontFeatures: tabular,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -525,7 +582,7 @@ class _RecommendedTag extends StatelessWidget {
   }
 }
 
-/// Where the file will be saved.
+/// Where the file will be saved; opens Settings, where it is chosen.
 class _SaveDestination extends StatelessWidget {
   const new({required this.path});
 
@@ -533,48 +590,36 @@ class _SaveDestination extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
     return Card(
       color: scheme.surfaceContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: scheme.surfaceContainerHighest,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.go(AppRoutes.settings),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: scheme.surfaceContainerHighest,
+                ),
+                child: Icon(
+                  Icons.folder_open_outlined,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
-              child: Icon(
-                Icons.folder_open_outlined,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.saveDestination.toUpperCase(),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(path, style: theme.textTheme.bodyLarge),
-                ],
-              ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(child: Text(path, style: theme.textTheme.bodyLarge)),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );

@@ -11,7 +11,8 @@
   "intakeFieldHint": "Paste a link",
   "intakePaste": "Paste",
   "intakeClear": "Clear",
-  "intakeFetch": "Get formats",
+  "intakeFetch": "Show options",
+  "intakeLinkHint": "Paste a full link, like a video's share link",
   "linkDetected": "{platform} · {kind}",
   "@linkDetected": {
     "description": "Status under the link box once the source is recognized, e.g. 'YouTube · Short'.",
@@ -31,11 +32,11 @@
   "platformOther": "Website",
   "noticeInvalidLink": "That doesn't look like a link.",
   "noticeClipboardEmpty": "There's no link on the clipboard.",
-  "noticePlaylistUnsupported": "Playlists aren't supported yet. Open a single video and share that instead.",
+  "noticePlaylistUnsupported": "Playlists aren't supported yet; share a single video instead.",
   "supportedTitle": "Works with",
   "supportedMore": "…and 1,000+ other sites",
   "shareTipTitle": "Tip",
-  "shareTip": "In any app, tap {share} and choose {appName} to instantly grab formats.",
+  "shareTip": "In any app, tap {share} and choose {appName} to instantly grab videos and photos.",
   "@shareTip": {
     "description": "{share} is shareAction and {appName} is appTitle; both are shown in bold.",
     "placeholders": {
@@ -47,23 +48,23 @@
   "@shareAction": {
     "description": "Name of the system Share button, as other apps show it."
   },
-  "preparingEngine": "Preparing the download engine. This takes a few seconds the first time.",
-  "fetchingFormats": "Getting formats…",
+  "preparingEngine": "Getting ready…",
+  "updatingEngine": "Getting the latest downloader so this link works…",
+  "fetchingFormats": "Getting options…",
   "saveAs": "Save as",
   "outputVideoDetail": "Audio & video",
   "outputAudioDetail": "Audio only",
   "outputImageDetail": "Still image",
   "qualityTitle": "Quality",
-  "formatTitle": "Format",
-  "containerLabel": "{ext} container",
+  "formatTitle": "Options",
+  "containerLabel": "{ext} file",
   "@containerLabel": {
-    "description": "File type of the selected option, e.g. 'MP4 container'.",
+    "description": "File type of the selected option, e.g. 'MP4 file'.",
     "placeholders": {
       "ext": {"type": "String"}
     }
   },
-  "previewReady": "Ready",
-  "formatsAvailable": "{count, plural, =1{1 format available} other{{count} formats available}}",
+  "formatsAvailable": "{count, plural, =1{1 option} other{{count} options}}",
   "@formatsAvailable": {
     "placeholders": {
       "count": {"type": "int"}
@@ -102,7 +103,7 @@
       "count": {"type": "int"}
     }
   },
-  "showAllOptions": "Show all {count} formats",
+  "showAllOptions": "Show all {count} options",
   "@showAllOptions": {
     "placeholders": {
       "count": {"type": "int"}
@@ -121,7 +122,7 @@
       "fps": {"type": "int"}
     }
   },
-  "formatCount": "{count, plural, =1{1 format} other{{count} formats}}",
+  "formatCount": "{count, plural, =1{1 option} other{{count} options}}",
   "@formatCount": {
     "placeholders": {
       "count": {"type": "int"}
@@ -145,8 +146,7 @@
       "size": {"type": "String"}
     }
   },
-  "sizeUnknown": "Size unknown",
-  "saveDestination": "Save destination",
+  "saveDestination": "Save location",
   "download": "Download",
   "downloadWithSize": "Download · {size}",
   "@downloadWithSize": {
@@ -155,12 +155,24 @@
     }
   },
   "downloadWaiting": "Waiting to start…",
-  "downloadRunning": "Downloading · {percent}%",
-  "@downloadRunning": {
+  "downloadRunning": "Downloading",
+  "downloadPercent": "{percent}%",
+  "@downloadPercent": {
     "placeholders": {
       "percent": {"type": "int"}
     }
   },
+  "downloadEta": "{time} left",
+  "@downloadEta": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "downloadStarting": "Starting…",
+  "downloadAgain": "Download again",
+  "downloadCancelling": "Cancelling…",
+  "downloadCancelled": "Download cancelled",
+  "downloadCancelUnavailable": "Almost done, so it can't be cancelled now",
   "downloadFinishing": "Finishing up…",
   "downloadSaved": "Saved to {path}",
   "@downloadSaved": {
@@ -187,6 +199,15 @@
   "libraryMore": "More options",
   "librarySearch": "Search",
   "librarySearchHint": "Search downloads",
+  "libraryClearSearch": "Clear search",
+  "libraryClearFilters": "Clear filters",
+  "libraryEmptyAction": "Paste a link",
+  "libraryDeletedItem": "Deleted “{title}”",
+  "@libraryDeletedItem": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
   "librarySearchClose": "Close search",
   "libraryFilterAll": "All",
   "libraryNoMatches": "Nothing matches",
@@ -267,7 +288,7 @@
   "themeLight": "Light",
   "themeDark": "Dark",
   "settingsFont": "Font",
-  "fontSystem": "Phone default",
+  "fontSystem": "Same as phone",
   "fontSystemHint": "The font your phone uses",
   "fontSans": "Modern",
   "fontSansHint": "Clean and simple",
@@ -286,15 +307,25 @@
       "appName": {"type": "String"}
     }
   },
+  "updateAvailableTitle": "Update available",
+  "updateAvailableBody": "{appName} {version} is out. Download it now and open the file to install.",
+  "@updateAvailableBody": {
+    "placeholders": {
+      "appName": {"type": "String"},
+      "version": {"type": "String"}
+    }
+  },
+  "updateLater": "Later",
+  "updateDownload": "Download now",
   "loading": "Loading…",
   "retry": "Retry",
-  "failureUnsupportedUrl": "This link isn't supported.",
+  "failureUnsupportedUrl": "This link isn't supported. Try a link to a single post or video.",
   "failureNetwork": "Network error. Check your connection and try again.",
-  "failureEngine": "The download engine ran into a problem.",
-  "failureStorage": "Couldn't save the file.",
-  "failureCancelled": "Cancelled.",
+  "failureEngine": "Couldn't download this link. Try again in a moment.",
+  "failureStorage": "Couldn't save the file. Check your free space and try again.",
+  "failureCancelled": "Cancelled",
   "failureNotFound": "This file was moved or deleted.",
-  "failureNoApp": "No app on this device can open this file.",
-  "failureUnavailable": "This isn't available in this version yet.",
-  "failureUnknown": "Something went wrong."
+  "failureNoApp": "No app on this device can open this file. Install a video or photo player and try again.",
+  "failureUnavailable": "This isn't available right now. Try again later.",
+  "failureUnknown": "Something went wrong. Try again."
 }

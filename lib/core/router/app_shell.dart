@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/theme/motion.dart';
+import 'package:media_downloader/features/updater/presentation/update_dialog.dart';
+import 'package:media_downloader/features/updater/presentation/update_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Bottom navigation around the top-level branches of the router.
@@ -19,6 +23,13 @@ class AppShell extends ConsumerWidget {
     // intake controller has already picked it up.
     ref.listen(sharedTextProvider, (_, next) {
       if (next.hasValue) shell.goBranch(0);
+    });
+
+    // Checked once per launch, so this asks at most once.
+    ref.listen(appUpdateProvider, (_, next) {
+      if (next.value case final update?) {
+        unawaited(showUpdateDialog(context, ref, update));
+      }
     });
 
     final scheme = Theme.of(context).colorScheme;

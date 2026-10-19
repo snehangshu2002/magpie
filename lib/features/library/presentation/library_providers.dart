@@ -98,4 +98,19 @@ class LibraryFilterState extends _$LibraryFilterState {
   void search(String query) => state = state.copyWith(query: () => query);
 
   void closeSearch() => state = state.copyWith(query: () => null);
+
+  /// Back to everything, with search closed.
+  void clear() => state = const LibraryFilter();
+}
+
+/// Whether a cancel for the download [id] was asked for and the engine hasn't
+/// confirmed it yet, so its tile can say "Cancelling…" at once.
+@riverpod
+class ActiveCancelling extends _$ActiveCancelling {
+  @override
+  bool build(String id) => false;
+
+  // Named argument, so a call site reads as what it does.
+  // ignore: use_setters_to_change_properties
+  void set({required bool value}) => state = value;
 }

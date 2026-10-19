@@ -54,12 +54,16 @@ Future<MediaPreview> mediaPreview(
   final resolved = platform == SourcePlatform.other
       ? SourcePlatform.fromExtractor(info.extractor)
       : platform;
-  final settings = await ref.watch(settingsProvider.future);
+  // Only these two shape the options; theme, font or folder changes must not
+  // re-fetch the link.
+  final (maxQuality, preferAudioForMusic) = await ref.watch(
+    settingsProvider.selectAsync((s) => (s.maxQuality, s.preferAudioForMusic)),
+  );
   final options = suggestDownloadOptions(
     info,
     platform: resolved,
-    maxQuality: settings.maxQuality,
-    preferAudioForMusic: settings.preferAudioForMusic,
+    maxQuality: maxQuality,
+    preferAudioForMusic: preferAudioForMusic,
   );
   if (options == null) throw const Failure.unsupportedUrl();
   return MediaPreview(info: info, platform: resolved, options: options);
@@ -85,6 +89,18 @@ class OptionsExpanded extends _$OptionsExpanded {
   void toggle() => state = !state;
 }
 
+/// Whether a cancel for [url] was asked for and the engine hasn't confirmed
+/// it yet, so the bar can say "Cancelling…" at once.
+@riverpod
+class CancelRequested extends _$CancelRequested {
+  @override
+  bool build(Uri url) => false;
+
+  // Named argument, so a call site reads as what it does.
+  // ignore: use_setters_to_change_properties
+  void set({required bool value}) => state = value;
+}
+
 /// Hands the chosen option for [url] to the engine and follows it: null
 /// before the first tap, then the latest progress; an error if it could not
 /// be started or failed.
@@ -101,6 +117,7 @@ class DownloadStarter extends _$DownloadStarter {
   Future<void> start(MediaPreview preview, DownloadOption option) async {
     if (state.value?.state.isActive ?? false) return;
     _stopFollowing();
+    ref.read(cancelRequestedProvider(url).notifier).set(value: false);
     state = const AsyncLoading();
     final repository = ref.read(mediaRepositoryProvider);
     final id = _newId();
@@ -143,7 +160,14 @@ class DownloadStarter extends _$DownloadStarter {
   Future<void> cancel() async {
     final download = state.value;
     if (download == null || !download.state.isActive) return;
-    await ref.read(mediaRepositoryProvider).cancelDownload(download.id);
+    final flag = ref.read(cancelRequestedProvider(url).notifier)
+      ..set(value: true);
+    final result = await ref
+        .read(mediaRepositoryProvider)
+        .cancelDownload(download.id);
+    // Nothing to cancel (already finished): let the bar show the real state.
+    if (!ref.mounted) return;
+    if (result case Err() || Ok(value: false)) flag.set(value: false);
   }
 
   /// Clears a finished download or failure, e.g. when the user picks another
@@ -156,7 +180,10 @@ class DownloadStarter extends _$DownloadStarter {
     state = progress.state == DownloadState.failed
         ? AsyncError(failureFromNativeCode(progress.error), StackTrace.current)
         : AsyncData(progress);
-    if (!progress.state.isActive) _stopFollowing();
+    if (!progress.state.isActive) {
+      _stopFollowing();
+      ref.read(cancelRequestedProvider(url).notifier).set(value: false);
+    }
   }
 
   // Not awaited: an EventChannel cancel waits on a platform round trip.

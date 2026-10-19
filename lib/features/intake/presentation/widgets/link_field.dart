@@ -54,16 +54,27 @@ class LinkField extends StatelessWidget {
     // A hairline at rest; sage while typing.
     return ListenableBuilder(
       listenable: focusNode,
-      builder: (context, child) => Material(
-        color: scheme.surfaceContainer,
-        shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: focusNode.hasFocus
-              ? BorderSide(color: scheme.primaryContainer, width: 1.5)
-              : BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
-        ),
-        clipBehavior: Clip.antiAlias,
+      builder: (context, child) => TweenAnimationBuilder<double>(
+        tween: Tween(end: focusNode.hasFocus ? 1 : 0),
+        duration: duration,
+        curve: AppMotion.standard,
         child: child,
+        builder: (context, t, child) => Material(
+          color: scheme.surfaceContainer,
+          shape: RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Color.lerp(
+                scheme.outlineVariant.withValues(alpha: 0.3),
+                scheme.primaryContainer,
+                t,
+              )!,
+              width: 1 + 0.5 * t,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        ),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 56),
@@ -71,23 +82,29 @@ class LinkField extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
           child: Row(
             children: [
-              AnimatedSwitcher(
-                duration: duration,
-                switchInCurve: AppMotion.standard,
-                switchOutCurve: AppMotion.standard,
-                transitionBuilder: popIn,
-                child: platform == null
-                    ? Icon(
-                        Icons.link_rounded,
-                        key: const ValueKey(null),
-                        size: 22,
-                        color: scheme.outline,
-                      )
-                    : PlatformBadge(
-                        key: ValueKey(platform),
-                        platform: platform,
-                        size: 32,
-                      ),
+              // Fixed slot so the text doesn't shift between icon and badge.
+              SizedBox.square(
+                dimension: 32,
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: duration,
+                    switchInCurve: AppMotion.standard,
+                    switchOutCurve: AppMotion.standard,
+                    transitionBuilder: popIn,
+                    child: platform == null
+                        ? Icon(
+                            Icons.link_rounded,
+                            key: const ValueKey(null),
+                            size: 22,
+                            color: scheme.outline,
+                          )
+                        : PlatformBadge(
+                            key: ValueKey(platform),
+                            platform: platform,
+                            size: 32,
+                          ),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -104,7 +121,7 @@ class LinkField extends StatelessWidget {
                   decoration: InputDecoration.collapsed(
                     hintText: l10n.intakeFieldHint,
                     hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                      color: scheme.outline,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -120,24 +137,44 @@ class LinkField extends StatelessWidget {
                   transitionBuilder: popIn,
                   child: hasText
                       ? Row(
-                          key: ValueKey(canSubmit),
+                          key: const ValueKey('edit'),
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              tooltip: l10n.intakeClear,
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: onClear,
-                            ),
-                            if (canSubmit)
-                              IconButton.filled(
-                                tooltip: l10n.intakeFetch,
-                                style: IconButton.styleFrom(
-                                  backgroundColor: scheme.primaryContainer,
-                                  foregroundColor: scheme.onPrimaryContainer,
-                                ),
-                                icon: const Icon(Icons.arrow_forward_rounded),
-                                onPressed: onSubmit,
+                            PressableScale(
+                              child: IconButton(
+                                tooltip: l10n.intakeClear,
+                                icon: const Icon(Icons.close_rounded),
+                                onPressed: onClear,
                               ),
+                            ),
+                            AnimatedSize(
+                              duration: duration,
+                              curve: AppMotion.standard,
+                              child: AnimatedSwitcher(
+                                duration: duration,
+                                switchInCurve: AppMotion.standard,
+                                switchOutCurve: AppMotion.standard,
+                                transitionBuilder: popIn,
+                                child: canSubmit
+                                    ? PressableScale(
+                                        key: const ValueKey('go'),
+                                        child: IconButton.filled(
+                                          tooltip: l10n.intakeFetch,
+                                          style: IconButton.styleFrom(
+                                            backgroundColor:
+                                                scheme.primaryContainer,
+                                            foregroundColor:
+                                                scheme.onPrimaryContainer,
+                                          ),
+                                          icon: const Icon(
+                                            Icons.arrow_forward_rounded,
+                                          ),
+                                          onPressed: onSubmit,
+                                        ),
+                                      )
+                                    : const SizedBox(key: ValueKey('nogo')),
+                              ),
+                            ),
                           ],
                         )
                       : PressableScale(

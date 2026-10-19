@@ -8,6 +8,7 @@ import android.os.Bundle
 import com.snehangshu.magpie.engine.YtDlpBridge
 import com.snehangshu.magpie.share.ShareBridge
 import com.snehangshu.magpie.storage.StorageBridge
+import com.snehangshu.magpie.updater.UpdaterBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import kotlinx.coroutines.CompletableDeferred
@@ -19,6 +20,7 @@ class MainActivity : FlutterActivity(), ActivityHost {
     private var storageBridge: StorageBridge? = null
     private val shareBridge = ShareBridge()
     private var appearanceBridge: AppearanceBridge? = null
+    private var updaterBridge: UpdaterBridge? = null
 
     // Permission prompts and system confirmations waiting for their result, by request code.
     private val pendingPermissions = mutableMapOf<Int, CompletableDeferred<Unit>>()
@@ -33,6 +35,7 @@ class MainActivity : FlutterActivity(), ActivityHost {
         storageBridge = StorageBridge(applicationContext, this).also { it.attach(messenger) }
         shareBridge.attach(messenger)
         appearanceBridge = AppearanceBridge(applicationContext).also { it.attach(messenger) }
+        updaterBridge = UpdaterBridge(applicationContext, this).also { it.attach(messenger) }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,6 +57,8 @@ class MainActivity : FlutterActivity(), ActivityHost {
         shareBridge.detach()
         appearanceBridge?.detach()
         appearanceBridge = null
+        updaterBridge?.detach()
+        updaterBridge = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 

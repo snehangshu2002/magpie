@@ -99,7 +99,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Test clip'), findsNothing);
-    expect(find.text('Deleted'), findsOneWidget);
+    expect(find.text('Deleted “Test clip”'), findsOneWidget);
     expect(find.text('Nothing downloaded yet'), findsOneWidget);
   });
 
@@ -254,6 +254,12 @@ void main() {
     await tester.enterText(find.byType(TextField), 'nothing like it');
     await tester.pumpAndSettle();
     expect(find.text('Nothing matches'), findsOneWidget);
+
+    await tester.tap(find.text('Clear filters'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing matches'), findsNothing);
+    expect(find.text('Test clip'), findsOneWidget);
+    expect(find.text('Test song'), findsOneWidget);
   });
 
   testWidgets('shows downloads in progress and cancels them', (tester) async {
