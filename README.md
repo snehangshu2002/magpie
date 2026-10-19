@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="Minimalist%20Ivory%20Bird%20Emblem.png" alt="Magpie logo" width="128" height="128">
+<img src="docs/branding/magpie-logo.png" alt="Magpie logo" width="128" height="128">
 
 # Magpie
 
