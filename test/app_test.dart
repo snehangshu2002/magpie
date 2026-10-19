@@ -43,14 +43,14 @@ class _FakeUpdateRepository implements UpdateRepository {
   new([this.update]);
 
   final AppUpdate? update;
-  final downloads = <AppUpdate>[];
+  final opened = <String>[];
 
   @override
   Future<Result<AppUpdate?>> check() async => Ok(update);
 
   @override
-  Future<Result<void>> download(AppUpdate update) async {
-    downloads.add(update);
+  Future<Result<void>> open(String url) async {
+    opened.add(url);
     return const Ok(null);
   }
 }
@@ -103,17 +103,55 @@ void main() {
   });
 
   testWidgets('a newer release is offered for download', (tester) async {
-    const update = AppUpdate(version: '1.2.0', url: 'https://example.com/a');
+    final update = AppUpdate(
+      version: '1.2.0',
+      url: 'https://example.com/a.apk',
+      pageUrl: 'https://example.com/release',
+      size: 32000000,
+      notes: const ['Reddit carousels'],
+      published: DateTime(2026, 10, 15),
+    );
     final updates = _FakeUpdateRepository(update);
     await pumpApp(tester, updates: updates);
     await tester.pumpAndSettle();
 
-    expect(find.text('Update available'), findsOneWidget);
-    await tester.tap(find.text('Download now'));
+    expect(find.text('Magpie 1.2.0 is available'), findsOneWidget);
+    expect(find.text('32 MB · Release notes'), findsOneWidget);
+    expect(find.text('Oct 2026'), findsOneWidget);
+    expect(find.text('Reddit carousels'), findsOneWidget);
+    await tester.tap(find.text('Update (32 MB)'));
     await tester.pumpAndSettle();
 
-    expect(updates.downloads, [update]);
-    expect(find.text('Update available'), findsNothing);
+    expect(updates.opened, ['https://example.com/a.apk']);
+    expect(find.text('Magpie 1.2.0 is available'), findsNothing);
+  });
+
+  testWidgets('settings links to the source code', (tester) async {
+    final updates = _FakeUpdateRepository();
+    await pumpApp(tester, updates: updates);
+    await openSettings(tester);
+    await tester.scrollUntilVisible(find.text('Source code on GitHub'), 200);
+
+    await tapSetting(tester, 'Source code on GitHub');
+
+    expect(updates.opened, ['https://github.com/snehangshu2002/magpie']);
+  });
+
+  testWidgets('a release without notes only offers the update', (tester) async {
+    const update = AppUpdate(
+      version: '1.2.0',
+      url: 'https://example.com/a.apk',
+      pageUrl: 'https://example.com/release',
+      size: 32000000,
+    );
+    await pumpApp(tester, updates: _FakeUpdateRepository(update));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Magpie 1.2.0 is available'), findsOneWidget);
+    expect(find.text('32 MB'), findsOneWidget);
+    expect(find.textContaining('Release notes'), findsNothing);
+    expect(find.text("What's new".toUpperCase()), findsNothing);
+    expect(find.text('Update (32 MB)'), findsOneWidget);
   });
 
   testWidgets('settings says updates are automatic, in plain words', (

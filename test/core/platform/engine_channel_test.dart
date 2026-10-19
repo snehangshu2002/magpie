@@ -86,6 +86,7 @@ void main() {
       'outputType': 'video',
       'targetDir': 'Download/App/Generic',
       'title': 'Test video',
+      'item': null,
     });
   });
 

@@ -256,16 +256,27 @@ DownloadOptions? _postOptions(
   SourcePlatform platform,
   int maxQuality,
 ) {
-  var photos = 0;
-  var videos = 0;
-  for (final e in entries) {
-    if (e.formats.isNotEmpty) {
-      videos++;
-    } else if (platform.hasPhotoPosts && e.thumbnail != null) {
-      photos++;
-    }
-  }
-  final count = photos + videos;
+  // Indexes count every entry, even one skipped here: the engine picks an
+  // item by its place in the post.
+  final items = <PostItem>[
+    for (final (i, e) in entries.indexed)
+      if (e.formats.isNotEmpty)
+        (
+          index: i + 1,
+          type: OutputType.video,
+          thumbnail: e.thumbnail,
+          duration: e.duration,
+        )
+      else if (platform.hasPhotoPosts && e.thumbnail != null)
+        (
+          index: i + 1,
+          type: OutputType.image,
+          thumbnail: e.thumbnail,
+          duration: null,
+        ),
+  ];
+  final videos = items.where((i) => i.type == OutputType.video).length;
+  final count = items.length;
   if (count == 0) return null;
 
   final type = videos == 0 ? OutputType.image : OutputType.video;
@@ -287,5 +298,6 @@ DownloadOptions? _postOptions(
         ? RecommendationReason.imageOnly
         : RecommendationReason.bestUpToCap,
     maxQuality: maxQuality,
+    postItems: count > 1 ? items : const [],
   );
 }

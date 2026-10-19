@@ -5,8 +5,8 @@ import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
-/// Shown before a link is entered: which sites work, and how to send a
-/// link here from another app.
+/// Shown before a link is entered: which sites work. Logos, not buttons,
+/// so they sit together in one quiet card.
 class SupportedPlatforms extends StatelessWidget {
   const new({super.key});
 
@@ -18,57 +18,60 @@ class SupportedPlatforms extends StatelessWidget {
     SourcePlatform.facebook,
   ];
 
-  static const _gap = 12.0;
-
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
+    final items = [
+      for (final platform in _featured) _PlatformItem(platform: platform),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionLabel(l10n.supportedTitle),
+        SectionLabel(context.l10n.supportedTitle),
         const SizedBox(height: 4),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Fewer, wider tiles when large text needs the room.
-            final columns = MediaQuery.textScalerOf(context).scale(1) > 1.3
-                ? 3
-                : 4;
-            final width =
-                (constraints.maxWidth - _gap * (columns - 1)) / columns;
-            return Wrap(
-              alignment: WrapAlignment.center,
-              spacing: _gap,
-              runSpacing: _gap,
-              children: [
-                for (final platform in _featured)
-                  SizedBox(
-                    width: width,
-                    child: _PlatformTile(platform: platform),
-                  ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 14),
-        Text(
-          l10n.supportedMore,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
+        DecoratedBox(
+          decoration: ShapeDecoration(
+            shape: AppTheme.shape(24),
+            color: scheme.surfaceContainer,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 20),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // One row while every name fits its fifth; narrow phones and
+                // large text wrap instead of cutting names.
+                final fits =
+                    constraints.maxWidth / items.length >=
+                    MediaQuery.textScalerOf(context).scale(68);
+                return fits
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final item in items) Expanded(child: item),
+                        ],
+                      )
+                    : Wrap(
+                        alignment: WrapAlignment.center,
+                        runSpacing: 16,
+                        children: [
+                          for (final item in items)
+                            SizedBox(
+                              width: MediaQuery.textScalerOf(context).scale(96),
+                              child: item,
+                            ),
+                        ],
+                      );
+              },
+            ),
           ),
         ),
-        const SizedBox(height: 28),
-        const _ShareTip(),
       ],
     );
   }
 }
 
-class _PlatformTile extends StatelessWidget {
+class _PlatformItem extends StatelessWidget {
   const new({required this.platform});
 
   final SourcePlatform platform;
@@ -76,42 +79,33 @@ class _PlatformTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
 
     return MergeSemantics(
-      child: DecoratedBox(
-        decoration: ShapeDecoration(
-          shape: AppTheme.shape(16),
-          color: scheme.surfaceContainerLow,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: Column(
-            children: [
-              // The name is right below; the logo needs no label of its own.
-              ExcludeSemantics(child: PlatformBadge(platform: platform)),
-              const SizedBox(height: 6),
-              Text(
-                platform.label(context.l10n),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+      child: Column(
+        children: [
+          // The name is right below; the logo needs no label of its own.
+          ExcludeSemantics(child: PlatformBadge(platform: platform, size: 48)),
+          const SizedBox(height: 8),
+          Text(
+            platform.label(context.l10n),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
 /// How to send a link here without copying it.
-class _ShareTip extends StatelessWidget {
-  const new();
+class ShareTip extends StatelessWidget {
+  const new({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +147,7 @@ class _ShareTip extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(l10n.shareTipTitle, style: theme.textTheme.titleMedium),

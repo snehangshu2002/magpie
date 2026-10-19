@@ -14,7 +14,9 @@ import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/data/media_repository_impl.dart';
 import 'package:media_downloader/features/download/domain/download_details.dart';
+import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/media_repository.dart';
+import 'package:media_downloader/features/intake/presentation/widgets/supported_platforms.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/settings_repository_impl.dart';
@@ -61,7 +63,26 @@ const _clip = MediaInfo(
   ],
 );
 
+/// A made-up carousel: a photo, then two clips.
+const _carousel = MediaInfo(
+  title: 'Test post',
+  extractor: 'instagram',
+  entries: [
+    MediaEntry(thumbnail: 'https://example.com/photo.jpg'),
+    MediaEntry(
+      duration: 12,
+      formats: [MediaFormat(formatId: 'v1', ext: 'mp4', height: 720)],
+    ),
+    MediaEntry(
+      duration: 30,
+      formats: [MediaFormat(formatId: 'v2', ext: 'mp4', height: 720)],
+    ),
+  ],
+);
+
 class _FakeMediaRepository implements MediaRepository {
+  /// What [fetchInfo] returns.
+  MediaInfo info = _clip;
   final fetched = <Uri>[];
   final requests = <DownloadRequest>[];
   final cancelled = <String>[];
@@ -73,7 +94,7 @@ class _FakeMediaRepository implements MediaRepository {
   @override
   Future<Result<MediaInfo>> fetchInfo(Uri url) async {
     fetched.add(url);
-    return const Ok(_clip);
+    return Ok(info);
   }
 
   @override
@@ -184,6 +205,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('the share tip rests at the bottom at its own height', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    final tip = tester.getRect(find.byType(ShareTip));
+    final nav = tester.getRect(find.byType(NavigationBar));
+    expect(tip.height, lessThan(200));
+    expect(nav.top - tip.bottom, lessThan(40));
+  });
+
   testWidgets('recognizes the site while typing, without fetching', (
     tester,
   ) async {
@@ -221,6 +252,40 @@ void main() {
 
     expect(find.text('M4A'), findsOneWidget);
     expect(find.text('Download · 3 MB'), findsOneWidget);
+  });
+
+  testWidgets('one item of a post can be picked and saved alone', (
+    tester,
+  ) async {
+    media.info = _carousel;
+    await pumpApp(tester);
+    await submit(tester, 'https://www.instagram.com/p/test123/');
+
+    expect(find.text('Choose what to save'), findsOneWidget);
+    expect(find.text('3 files'), findsWidgets);
+
+    await tester.tap(find.bySemanticsLabel('Item 2, Video'));
+    await tester.pumpAndSettle();
+    expect(find.text('Item 2 of 3'), findsOneWidget);
+
+    await tester.tap(find.text('Download').first);
+    await tester.pump(const Duration(seconds: 1));
+
+    final request = media.requests.single;
+    expect(request.formatId, postSelector);
+    expect(request.item, 2);
+    expect(request.outputType, OutputType.video);
+  });
+
+  testWidgets('a whole post is saved by default', (tester) async {
+    media.info = _carousel;
+    await pumpApp(tester);
+    await submit(tester, 'https://www.instagram.com/p/test123/');
+
+    await tester.tap(find.text('Download').first);
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(media.requests.single.item, isNull);
   });
 
   // The queued state shows a spinner, so these pump a fixed time instead of

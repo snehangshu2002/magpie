@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/router/app_router.dart';
+import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
+import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
@@ -112,12 +114,19 @@ class DownloadPanel extends ConsumerWidget {
         ? list.take(_collapsedCount).toList()
         : list;
     final ext = selected.ext?.toUpperCase();
+    final picked = options.postItemOf(selected);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         MediaPreviewCard(
-          info: preview.info,
+          // The preview follows the item picked from a post.
+          info: picked == null
+              ? preview.info
+              : preview.info.copyWith(
+                  thumbnail: picked.thumbnail ?? preview.info.thumbnail,
+                  duration: picked.duration,
+                ),
           platform: preview.platform,
           availability:
               options.recommended.postLabel(l10n) ??
@@ -126,90 +135,332 @@ class DownloadPanel extends ConsumerWidget {
               ),
         ),
         const SizedBox(height: 28),
-        _SectionHeader(
-          title: l10n.saveAs,
-          trailing: selected.type.detail(l10n),
-        ),
-        const SizedBox(height: 10),
-        if (options.types.length > 1) ...[
+        if (options.postItems.isNotEmpty) ...[
+          _SectionHeader(
+            title: l10n.postPickTitle,
+            trailing: picked == null
+                ? options.recommended.postLabel(l10n)
+                : l10n.postPickedItem(picked.index, options.postItems.length),
+          ),
+          const SizedBox(height: 10),
           _Dimmed(
             dimmed: locked,
-            child: _TypePicker(
-              types: options.types,
-              selected: selected.type,
-              onSelected: locked
+            child: _PostItemPicker(
+              items: options.postItems,
+              picked: picked,
+              onPicked: locked
                   ? null
-                  : (type) => select(options.defaultFor(type)),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-        _SectionHeader(
-          title: selected.type == OutputType.video
-              ? l10n.qualityTitle
-              : l10n.formatTitle,
-          trailing: ext == null ? null : l10n.containerLabel(ext),
-        ),
-        const SizedBox(height: 10),
-        _Dimmed(
-          dimmed: locked,
-          child: Card(
-            color: scheme.surfaceContainer,
-            child: AnimatedSize(
-              duration: duration,
-              curve: AppMotion.standard,
-              alignment: Alignment.topCenter,
-              child: Column(
-                children: [
-                  for (final (i, option) in visible.indexed) ...[
-                    if (i > 0)
-                      Divider(
-                        height: 1,
-                        color: scheme.outlineVariant.withValues(alpha: 0.5),
-                      ),
-                    _OptionTile(
-                      option: option,
-                      selected: option == selected,
-                      reason: option == options.recommended
-                          ? options.reason.text(l10n, options.maxQuality)
-                          : null,
-                      onTap: locked ? null : () => select(option),
+                  : (item) => select(
+                      item == null
+                          ? options.recommended
+                          : options.optionFor(item),
                     ),
-                  ],
-                ],
-              ),
             ),
           ),
-        ),
-        if (canCollapse) ...[
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton.icon(
-              onPressed: ref.read(optionsExpandedProvider(url).notifier).toggle,
-              style: TextButton.styleFrom(
-                foregroundColor: scheme.onSurfaceVariant,
+          const SizedBox(height: 16),
+        ] else ...[
+          _SectionHeader(
+            title: l10n.saveAs,
+            trailing: selected.type.detail(l10n),
+          ),
+          const SizedBox(height: 10),
+          if (options.types.length > 1) ...[
+            _Dimmed(
+              dimmed: locked,
+              child: _TypePicker(
+                types: options.types,
+                selected: selected.type,
+                onSelected: locked
+                    ? null
+                    : (type) => select(options.defaultFor(type)),
               ),
-              iconAlignment: IconAlignment.end,
-              icon: AnimatedRotation(
-                turns: expanded ? 0.5 : 0,
+            ),
+            const SizedBox(height: 24),
+          ],
+          _SectionHeader(
+            title: selected.type == OutputType.video
+                ? l10n.qualityTitle
+                : l10n.formatTitle,
+            trailing: ext == null ? null : l10n.containerLabel(ext),
+          ),
+          const SizedBox(height: 10),
+          _Dimmed(
+            dimmed: locked,
+            child: Card(
+              color: scheme.surfaceContainer,
+              child: AnimatedSize(
                 duration: duration,
                 curve: AppMotion.standard,
-                child: const Icon(Icons.expand_more_rounded),
-              ),
-              label: Text(
-                expanded
-                    ? l10n.showFewerOptions
-                    : l10n.showAllOptions(list.length),
+                alignment: Alignment.topCenter,
+                child: Column(
+                  children: [
+                    for (final (i, option) in visible.indexed) ...[
+                      if (i > 0)
+                        Divider(
+                          height: 1,
+                          color: scheme.outlineVariant.withValues(alpha: 0.5),
+                        ),
+                      _OptionTile(
+                        option: option,
+                        selected: option == selected,
+                        reason: option == options.recommended
+                            ? options.reason.text(l10n, options.maxQuality)
+                            : null,
+                        onTap: locked ? null : () => select(option),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
+          if (canCollapse) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton.icon(
+                onPressed: ref
+                    .read(optionsExpandedProvider(url).notifier)
+                    .toggle,
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onSurfaceVariant,
+                ),
+                iconAlignment: IconAlignment.end,
+                icon: AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: duration,
+                  curve: AppMotion.standard,
+                  child: const Icon(Icons.expand_more_rounded),
+                ),
+                label: Text(
+                  expanded
+                      ? l10n.showFewerOptions
+                      : l10n.showAllOptions(list.length),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
         ],
-        const SizedBox(height: 16),
         SectionLabel(l10n.saveDestination),
         _SaveDestination(path: saveDirFor(saveFolder, preview.platform)),
       ],
     );
   }
+}
+
+/// The items of a post as thumbnails, after an "All" tile: tap one to save
+/// it alone. [picked] null means the whole post.
+class _PostItemPicker extends StatelessWidget {
+  const new({required this.items, required this.picked, this.onPicked});
+
+  final List<PostItem> items;
+  final PostItem? picked;
+  final ValueChanged<PostItem?>? onPicked;
+
+  static const _size = 88.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final onPicked = this.onPicked;
+
+    return SizedBox(
+      height: _size,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        itemCount: items.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final item = i == 0 ? null : items[i - 1];
+          return _PostItemTile(
+            selected: item == picked,
+            label: item == null
+                ? l10n.postPickAll(items.length)
+                : l10n.postItemLabel(item.index, item.type.label(l10n)),
+            onTap: onPicked == null ? null : () => onPicked(item),
+            child: item == null
+                ? ColoredBox(
+                    color: scheme.surfaceContainerHigh,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.collections_outlined,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          l10n.postPickAll(items.length),
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _PostItemThumbnail(item: item, size: _size),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A square picker tile with a ring and check mark while [selected].
+class _PostItemTile extends StatelessWidget {
+  const new({
+    required this.selected,
+    required this.label,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool selected;
+  final String label;
+  final VoidCallback? onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final duration = AppMotion.durationOf(context);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: onTap != null,
+      label: label,
+      excludeSemantics: true,
+      child: PressableScale(
+        enabled: onTap != null,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: AnimatedContainer(
+              duration: duration,
+              curve: AppMotion.standard,
+              padding: EdgeInsets.all(selected ? 3 : 0),
+              decoration: ShapeDecoration(
+                shape: AppTheme.shape(18),
+                color: selected ? scheme.primary : Colors.transparent,
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipPath(
+                    clipper: ShapeBorderClipper(
+                      shape: AppTheme.shape(selected ? 15 : 18),
+                    ),
+                    child: child,
+                  ),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: AnimatedScale(
+                      scale: selected ? 1 : 0,
+                      duration: duration,
+                      curve: AppMotion.standard,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: scheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// An item's picture with its number and, for a video, its length.
+class _PostItemThumbnail extends StatelessWidget {
+  const new({required this.item, required this.size});
+
+  final PostItem item;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final thumbnail = item.thumbnail;
+    final duration = item.duration;
+    final placeholder = ColoredBox(
+      color: scheme.surfaceContainerHighest,
+      child: Icon(item.type.icon, color: scheme.onSurfaceVariant),
+    );
+    // Deliberately fixed: white on a dark scrim over a photo.
+    final badge = theme.textTheme.labelSmall?.copyWith(
+      color: Colors.white,
+      fontWeight: FontWeight.w600,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (thumbnail == null)
+          placeholder
+        else
+          Image.network(
+            thumbnail,
+            fit: BoxFit.cover,
+            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+            errorBuilder: (_, _, _) => placeholder,
+          ),
+        Positioned(
+          left: 6,
+          bottom: 6,
+          child: _Scrim(child: Text('${item.index}', style: badge)),
+        ),
+        Positioned(
+          right: 6,
+          bottom: 6,
+          child: _Scrim(
+            child: item.type == OutputType.video && duration != null
+                ? Text(formatDuration(duration), style: badge)
+                : Icon(item.type.icon, size: 12, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Scrim extends StatelessWidget {
+  const new({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: ShapeDecoration(
+      shape: const StadiumBorder(),
+      color: Colors.black.withValues(alpha: 0.6),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: child,
+    ),
+  );
 }
 
 /// Fades [child] while it can't be changed.

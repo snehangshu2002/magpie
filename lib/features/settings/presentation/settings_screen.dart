@@ -6,9 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/errors/failure_message.dart';
 import 'package:media_downloader/core/theme/app_theme.dart';
+import 'package:media_downloader/core/utils/result.dart';
+import 'package:media_downloader/core/widgets/page_header.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
+import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
+import 'package:media_downloader/features/updater/domain/app_update.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 extension AppearanceModeLabel on AppearanceMode {
@@ -44,19 +48,24 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     final controller = ref.read(settingsProvider.notifier);
 
+    final side = PageLayout.gutter(context);
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.large(
-            title: Text(
-              l10n.navSettings,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
+          SliverAppBar(
+            pinned: true,
+            titleSpacing: side,
+            title: const BrandTitle(),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: EdgeInsets.fromLTRB(side, 12, side, 32),
             sliver: SliverList.list(
               children: [
+                PageHeader(
+                  title: l10n.settingsTitle,
+                  subtitle: l10n.settingsHint,
+                ),
                 SectionLabel(l10n.settingsAppearance),
                 _Group(
                   children: [
@@ -156,6 +165,12 @@ class SettingsScreen extends ConsumerWidget {
                 _Group(
                   children: [
                     _SettingTile(
+                      icon: Icons.code_rounded,
+                      title: l10n.settingsSourceCode,
+                      subtitle: 'github.com/$projectRepo',
+                      onTap: () => _openSourceCode(context, ref),
+                    ),
+                    _SettingTile(
                       icon: Icons.description_outlined,
                       title: l10n.settingsLicenses,
                       onTap: () => showLicensePage(
@@ -243,6 +258,20 @@ class SettingsScreen extends ConsumerWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  static Future<void> _openSourceCode(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await ref
+        .read(updateRepositoryProvider)
+        .open('https://github.com/$projectRepo');
+    if (opened case Err(:final failure)) {
+      messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+    }
   }
 
   static void _toggleAudio(Settings controller, bool value) {

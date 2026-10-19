@@ -15,7 +15,7 @@ class UpdateRepositoryImpl implements UpdateRepository {
   new(this._channel);
 
   static final Uri latestRelease = Uri.parse(
-    'https://api.github.com/repos/snehangshu2002/magpie/releases/latest',
+    'https://api.github.com/repos/$projectRepo/releases/latest',
   );
 
   final UpdaterChannel _channel;
@@ -45,15 +45,22 @@ class UpdateRepositoryImpl implements UpdateRepository {
       final release = jsonDecode(body) as Map<String, dynamic>;
       final tag = release['tag_name'] as String;
       if (!isNewerVersion(tag, app.version)) return const Ok(null);
-      final apks = {
+      final assets = {
         for (final asset in release['assets'] as List)
-          (asset as Map)['name'] as String:
-              asset['browser_download_url'] as String,
+          (asset as Map)['name'] as String: asset,
       };
+      final apk = assets[apkFor(assets.keys, app.abis)];
+      final page = release['html_url'] as String;
       return Ok(
         AppUpdate(
           version: tag.replaceFirst(RegExp('^v'), ''),
-          url: apkFor(apks, app.abis) ?? release['html_url'] as String,
+          url: apk?['browser_download_url'] as String? ?? page,
+          pageUrl: page,
+          size: apk?['size'] as int?,
+          notes: releaseNoteLines(release['body'] as String? ?? ''),
+          published: DateTime.tryParse(
+            release['published_at'] as String? ?? '',
+          ),
         ),
       );
     } on IOException catch (e) {
@@ -68,8 +75,8 @@ class UpdateRepositoryImpl implements UpdateRepository {
   }
 
   @override
-  Future<Result<void>> download(AppUpdate update) =>
-      guardPlatformCall(() => _channel.openUrl(update.url));
+  Future<Result<void>> open(String url) =>
+      guardPlatformCall(() => _channel.openUrl(url));
 }
 
 @Riverpod(keepAlive: true)

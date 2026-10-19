@@ -279,6 +279,37 @@ void main() {
       );
     });
 
+    test('each item of a post can be saved alone, by its place', () {
+      final options = suggestPost([photo, clip])!;
+
+      expect(options.postItems.map((i) => (i.index, i.type)), [
+        (1, OutputType.image),
+        (2, OutputType.video),
+      ]);
+      final second = options.optionFor(options.postItems[1]);
+      expect(second.formatSelector, postSelector);
+      expect(second.item, 2);
+      expect(second.type, OutputType.video);
+      expect(options.postItemOf(second), options.postItems[1]);
+      expect(options.postItemOf(options.recommended), isNull);
+    });
+
+    test('a skipped item keeps the places of the ones after it', () {
+      // On X a formatless item isn't a photo, but it still takes place 1.
+      final options = suggestPost([
+        photo,
+        clip,
+        clip,
+      ], platform: SourcePlatform.x)!;
+
+      expect(options.postItems.map((i) => i.index), [2, 3]);
+    });
+
+    test('a post with one item has nothing to pick from', () {
+      expect(suggestPost([clip])!.postItems, isEmpty);
+      expect(suggestPost(null)!.postItems, isEmpty);
+    });
+
     test('nothing to save without formats or a photo', () {
       expect(suggestPost(null, thumbnail: null), isNull);
     });

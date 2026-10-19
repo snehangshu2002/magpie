@@ -134,10 +134,13 @@ class DownloadStarter extends _$DownloadStarter {
           preview.platform,
         ),
         title: preview.info.title,
+        item: option.item,
       ),
       DownloadDetails(
         platform: preview.platform,
-        thumbnail: preview.info.thumbnail,
+        thumbnail:
+            preview.options.postItemOf(option)?.thumbnail ??
+            preview.info.thumbnail,
         ext: option.ext,
         quality: option.quality,
         sizeBytes: option.sizeBytes,

@@ -1,13 +1,33 @@
 import 'package:media_downloader/core/utils/result.dart';
 
+/// The app's GitHub repository (`owner/name`): its source and releases.
+const projectRepo = 'snehangshu2002/magpie';
+
 /// A release newer than the installed app.
 class AppUpdate {
-  const new({required this.version, required this.url});
+  const new({
+    required this.version,
+    required this.url,
+    required this.pageUrl,
+    this.size,
+    this.notes = const [],
+    this.published,
+  });
 
   final String version;
 
-  /// The APK for this phone, or the release page when none matches.
+  /// The APK for this phone, or [pageUrl] when none matches.
   final String url;
+
+  /// The release on GitHub, with its full notes.
+  final String pageUrl;
+
+  /// Bytes of the APK at [url]; null when that is the release page.
+  final int? size;
+
+  /// The bullet points of the release notes.
+  final List<String> notes;
+  final DateTime? published;
 }
 
 abstract interface class UpdateRepository {
@@ -15,8 +35,8 @@ abstract interface class UpdateRepository {
   /// null.
   Future<Result<AppUpdate?>> check();
 
-  /// Opens the update's download in the browser.
-  Future<Result<void>> download(AppUpdate update);
+  /// Opens [url] (an update's APK or release page) in the browser.
+  Future<Result<void>> open(String url);
 }
 
 /// Whether release tag [latest] (`v1.2.0`) is newer than [current]
@@ -40,13 +60,21 @@ bool isNewerVersion(String latest, String current) {
   return false;
 }
 
-/// The asset in [apks] (name -> download URL) built for the first of
-/// [abis] that has one; CI names them `magpie-<version>-<abi>.apk`.
-String? apkFor(Map<String, String> apks, List<String> abis) {
+/// The asset name in [names] built for the first of [abis] that has one;
+/// CI names them `magpie-<version>-<abi>.apk`.
+String? apkFor(Iterable<String> names, List<String> abis) {
   for (final abi in abis) {
-    for (final MapEntry(:key, :value) in apks.entries) {
-      if (key.endsWith('-$abi.apk')) return value;
+    for (final name in names) {
+      if (name.endsWith('-$abi.apk')) return name;
     }
   }
   return null;
 }
+
+/// The `-`/`*` bullets of a release's Markdown notes (the workflow's
+/// `notes` input becomes one `- ` line per point).
+List<String> releaseNoteLines(String body) => [
+  for (final line in body.split('\n'))
+    if (RegExp(r'^\s*[-*]\s+(.+)$').firstMatch(line) case final m?)
+      m.group(1)!.trim(),
+];

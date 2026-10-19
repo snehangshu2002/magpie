@@ -7,6 +7,11 @@
   "navDownload": "Download",
   "navLibrary": "Library",
   "navSettings": "Settings",
+  "libraryTitle": "Your library",
+  "libraryHint": "Everything you've saved, newest first.",
+  "settingsTitle": "Make it yours",
+  "settingsHint": "How Magpie looks and where it saves.",
+  "intakeTitle": "What do you want to save?",
   "intakeHint": "Save videos, music and photos from the apps you use.",
   "intakeFieldHint": "Paste a link",
   "intakePaste": "Paste",
@@ -34,7 +39,6 @@
   "noticeClipboardEmpty": "There's no link on the clipboard.",
   "noticePlaylistUnsupported": "Playlists aren't supported yet; share a single video instead.",
   "supportedTitle": "Works with",
-  "supportedMore": "…and 1,000+ other sites",
   "shareTipTitle": "Tip",
   "shareTip": "In any app, tap {share} and choose {appName} to instantly grab videos and photos.",
   "@shareTip": {
@@ -94,6 +98,29 @@
   "@postPhotos": {
     "placeholders": {
       "count": {"type": "int"}
+    }
+  },
+  "postPickTitle": "Choose what to save",
+  "postPickAll": "All {count}",
+  "@postPickAll": {
+    "description": "Picker tile that saves every item of a post.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "postPickedItem": "Item {index} of {count}",
+  "@postPickedItem": {
+    "placeholders": {
+      "index": {"type": "int"},
+      "count": {"type": "int"}
+    }
+  },
+  "postItemLabel": "Item {index}, {kind}",
+  "@postItemLabel": {
+    "description": "Screen reader label of one picker tile, e.g. 'Item 2, Video'.",
+    "placeholders": {
+      "index": {"type": "int"},
+      "kind": {"type": "String"}
     }
   },
   "postFiles": "{count, plural, =1{1 file} other{{count} files}}",
@@ -300,6 +327,7 @@
   "settingsAutoUpdateDone": "Up to date. Keeps downloads working as sites change",
   "settingsAutoUpdateFailed": "Couldn't update. Check your connection",
   "settingsAbout": "About",
+  "settingsSourceCode": "Source code on GitHub",
   "settingsLicenses": "Open-source licenses",
   "settingsFooter": "{appName} is free and open source. Respect creators and only save what you have the right to.",
   "@settingsFooter": {
@@ -307,16 +335,23 @@
       "appName": {"type": "String"}
     }
   },
-  "updateAvailableTitle": "Update available",
-  "updateAvailableBody": "{appName} {version} is out. Download it now and open the file to install.",
-  "@updateAvailableBody": {
+  "updateAvailableTitle": "{appName} {version} is available",
+  "@updateAvailableTitle": {
     "placeholders": {
       "appName": {"type": "String"},
       "version": {"type": "String"}
     }
   },
+  "updateReleaseNotes": "Release notes",
+  "updateWhatsNew": "What's new",
+  "updateInstall": "Update",
+  "updateInstallSize": "Update ({size})",
+  "@updateInstallSize": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
   "updateLater": "Later",
-  "updateDownload": "Download now",
   "loading": "Loading…",
   "retry": "Retry",
   "failureUnsupportedUrl": "This link isn't supported. Try a link to a single post or video.",

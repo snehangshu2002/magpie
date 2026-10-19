@@ -1,10 +1,18 @@
-# Push a tag like v1.2.0 to build signed APKs and publish them as a GitHub
-# release. The app checks releases/latest and offers the APK for its ABI.
+# Run by hand (Actions -> Release -> Run workflow) to build signed APKs and
+# publish them as a GitHub release. The app checks releases/latest and offers
+# the APK for its ABI.
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, like 1.2.0 (becomes the release tag v1.2.0)'
+        required: true
+      notes:
+        description: "What's new, shown in the app. Optional; separate points with ;"
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -12,7 +20,15 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
     steps:
+      - name: Check version
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must look like 1.2.0, got '$VERSION'"; exit 1
+          fi
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
@@ -49,18 +65,22 @@ jobs:
 
       - name: Build APKs
         run: |
-          # v1.2.0 -> versionName 1.2.0; the run number keeps versionCode increasing.
+          # The run number keeps versionCode increasing.
           flutter build apk --release --split-per-abi \
-            --build-name "${GITHUB_REF_NAME#v}" --build-number "$GITHUB_RUN_NUMBER"
+            --build-name "$VERSION" --build-number "$GITHUB_RUN_NUMBER"
           cd build/app/outputs/flutter-apk
           for f in app-*-release.apk; do
             abi="${f#app-}"; abi="${abi%-release.apk}"
-            mv "$f" "magpie-${GITHUB_REF_NAME#v}-$abi.apk"
+            mv "$f" "magpie-$VERSION-$abi.apk"
           done
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/app/outputs/flutter-apk/magpie-*.apk \
-            --title "Magpie ${GITHUB_REF_NAME#v}" --generate-notes
+          # "a; - b" -> "- a\n- b": the app shows each "- " line as a point, and nothing when empty.
+          printf '%s' "$NOTES" | tr ';' '\n' \
+            | sed -E 's/^[[:space:]]*([-*•][[:space:]]*)?//; s/[[:space:]]+$//; /^$/d; s/^/- /' > notes.md
+          gh release create "v$VERSION" build/app/outputs/flutter-apk/magpie-*.apk \
+            --target "$GITHUB_SHA" --title "Magpie $VERSION" --notes-file notes.md

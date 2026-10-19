@@ -27,8 +27,20 @@ abstract class DownloadOption with _$DownloadOption {
 
     /// Files saved: more than one for a whole post.
     @Default(1) int count,
+
+    /// 1-based item of a post to save alone; null saves the whole post.
+    int? item,
   }) = _DownloadOption;
 }
+
+/// One item of a post with several, as the user sees it in the picker.
+/// `index` is the item's 1-based place in the post, which the engine uses.
+typedef PostItem = ({
+  int index,
+  OutputType type,
+  String? thumbnail,
+  int? duration,
+});
 
 /// `startDownload` selector that saves every item of the link: videos in
 /// the best quality, photos as they are.
@@ -56,6 +68,10 @@ abstract class DownloadOptions with _$DownloadOptions {
 
     /// Highest video quality picked by default (short side in pixels).
     required int maxQuality,
+
+    /// The items of a post with several, in order, so one can be saved
+    /// alone; empty otherwise.
+    @Default(<PostItem>[]) List<PostItem> postItems,
   }) = _DownloadOptions;
 }
 
@@ -84,4 +100,17 @@ extension DownloadOptionsX on DownloadOptions {
   }
 
   DownloadOption get recommended => defaultFor(recommendedType);
+
+  /// Saves only [item] of the post.
+  DownloadOption optionFor(PostItem item) => DownloadOption(
+    type: item.type,
+    formatSelector: postSelector,
+    ext: item.type == OutputType.image ? 'jpg' : null,
+    item: item.index,
+  );
+
+  /// The post item [option] saves alone; null for the whole post.
+  PostItem? postItemOf(DownloadOption option) => option.item == null
+      ? null
+      : postItems.where((i) => i.index == option.item).firstOrNull;
 }

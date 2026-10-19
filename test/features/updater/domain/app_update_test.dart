@@ -12,13 +12,30 @@ void main() {
   });
 
   test('picks the APK for the first supported ABI', () {
-    const apks = {
-      'magpie-1.2.0-armeabi-v7a.apk': 'v7',
-      'magpie-1.2.0-arm64-v8a.apk': 'v8',
-      'magpie-1.2.0-x86_64.apk': 'x64',
-    };
-    expect(apkFor(apks, ['arm64-v8a', 'armeabi-v7a']), 'v8');
-    expect(apkFor(apks, ['x86', 'armeabi-v7a']), 'v7');
+    const apks = [
+      'magpie-1.2.0-armeabi-v7a.apk',
+      'magpie-1.2.0-arm64-v8a.apk',
+      'magpie-1.2.0-x86_64.apk',
+    ];
+    expect(
+      apkFor(apks, ['arm64-v8a', 'armeabi-v7a']),
+      'magpie-1.2.0-arm64-v8a.apk',
+    );
+    expect(
+      apkFor(apks, ['x86', 'armeabi-v7a']),
+      'magpie-1.2.0-armeabi-v7a.apk',
+    );
     expect(apkFor(apks, ['mips']), isNull);
+  });
+
+  test('keeps the bullets of the release notes', () {
+    const body = '''
+## What's new
+- Faster YouTube 4K
+* Reddit carousels
+
+Thanks for using it''';
+    expect(releaseNoteLines(body), ['Faster YouTube 4K', 'Reddit carousels']);
+    expect(releaseNoteLines(''), isEmpty);
   });
 }

@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
+import 'package:media_downloader/core/widgets/page_header.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_bar.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
@@ -92,7 +92,6 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final theme = Theme.of(context);
     final state = ref.watch(intakeControllerProvider);
     final submitted = state.submitted;
     final preview = submitted == null
@@ -182,17 +181,18 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
         builder: (context) {
           final bottomInset = MediaQuery.paddingOf(context).bottom;
           _keepEndInView(bottomInset, duration);
+          final side = PageLayout.gutter(context);
           return CustomScrollView(
             controller: _scroll,
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
-              const SliverAppBar(
+              SliverAppBar(
                 pinned: true,
-                titleSpacing: 16,
-                title: _BrandTitle(),
+                titleSpacing: side,
+                title: const BrandTitle(),
               ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 24),
+                padding: EdgeInsets.fromLTRB(side, 12, side, 0),
                 sliver: SliverList.list(
                   children: [
                     // The introduction steps aside once there's a link to
@@ -203,31 +203,9 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                       alignment: Alignment.topCenter,
                       child: submitted != null
                           ? const SizedBox(width: double.infinity)
-                          : Padding(
-                              padding: const EdgeInsets.only(bottom: 24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Semantics(
-                                    header: true,
-                                    child: Text(
-                                      l10n.navDownload,
-                                      style: theme.textTheme.headlineMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    l10n.intakeHint,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          : PageHeader(
+                              title: l10n.intakeTitle,
+                              subtitle: l10n.intakeHint,
                             ),
                     ),
                     LinkField(
@@ -279,43 +257,33 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                   ],
                 ),
               ),
+              // The share tip rests at the bottom of a tall screen rather
+              // than leaving the lower half empty; it steps aside for results.
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(side, 0, side, bottomInset + 24),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: AnimatedSwitcher(
+                      duration: duration,
+                      switchInCurve: AppMotion.standard,
+                      switchOutCurve: AppMotion.standard,
+                      child: submitted == null
+                          ? const Padding(
+                              key: ValueKey('tip'),
+                              padding: EdgeInsets.only(top: 28),
+                              child: ShareTip(),
+                            )
+                          : const SizedBox(width: double.infinity),
+                    ),
+                  ),
+                ),
+              ),
             ],
           );
         },
       ),
-    );
-  }
-}
-
-/// The app's mark and name.
-class _BrandTitle extends StatelessWidget {
-  const new();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        ClipPath(
-          clipper: ShapeBorderClipper(shape: AppTheme.shape(10)),
-          child: Image.asset(
-            'assets/images/logo.png',
-            width: 32,
-            height: 32,
-            excludeFromSemantics: true,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Semantics(
-          header: true,
-          child: Text(
-            context.l10n.appTitle,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

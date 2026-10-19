@@ -19,6 +19,9 @@ abstract class DownloadRequest with _$DownloadRequest {
 
     /// Shown in the progress notification.
     String? title,
+
+    /// 1-based item of a `post` to save alone; null saves every item.
+    int? item,
   }) = _DownloadRequest;
 
   factory fromJson(Map<String, dynamic> json) =>

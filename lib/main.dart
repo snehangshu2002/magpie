@@ -8,15 +8,22 @@ import 'package:media_downloader/features/settings/presentation/settings_provide
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Bundled fonts are under the OFL, which asks for its text to ship with them.
+  // Bundled fonts (OFL) and the native downloader (GPL, PSF, Unlicense) ask
+  // for their licence text to ship with the app; Dart packages are listed
+  // automatically.
   LicenseRegistry.addLicense(() async* {
-    for (final (family, file) in [
-      ('Inter', 'Inter-OFL.txt'),
-      ('Source Serif 4', 'SourceSerif4-OFL.txt'),
+    for (final (name, file) in [
+      ('Inter', 'fonts/Inter-OFL.txt'),
+      ('Source Serif 4', 'fonts/SourceSerif4-OFL.txt'),
+      ('youtubedl-android', 'licenses/GPL-3.0.txt'),
+      // Built by Termux with --enable-gpl --enable-version3.
+      ('FFmpeg', 'licenses/GPL-3.0.txt'),
+      ('yt-dlp', 'licenses/yt-dlp-Unlicense.txt'),
+      ('Python', 'licenses/Python-PSF.txt'),
     ]) {
       yield LicenseEntryWithLineBreaks([
-        family,
-      ], await rootBundle.loadString('assets/fonts/$file'));
+        name,
+      ], await rootBundle.loadString('assets/$file'));
     }
   });
 

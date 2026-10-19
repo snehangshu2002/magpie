@@ -35,6 +35,8 @@ data class DownloadRequest(
     val outputType: String,
     val targetDir: String,
     val title: String?,
+    /** 1-based item of a `post` to save alone; null saves every item. */
+    val item: Int? = null,
 )
 
 /**
@@ -207,6 +209,7 @@ class DownloadService : Service() {
             addOption("--ignore-no-formats-error")
             addOption("--ignore-errors")
             addOption("--write-thumbnail")
+            task.request.item?.let { addOption("-I", it.toString()) }
             // "<index> <id>.<ext>"; ids have no spaces.
             addOption("-o", File(workDir, "%(playlist_index|0)s %(id)s.%(ext)s").absolutePath)
             addOption("--no-mtime")
@@ -256,7 +259,10 @@ class DownloadService : Service() {
             // Instagram's photos are JPEGs whose URL ends in ".heic".
             val ext = MediaStoreSaver.imageExtensionOf(file) ?: file.extension
             val base = title ?: file.name.substringBefore('.').substringAfter(' ')
-            val name = if (saved.size > 1) "$base ${i + 1}.$ext" else "$base.$ext"
+            // One item keeps its place in the post, so items saved one by one
+            // don't all share the post's name.
+            val number = task.request.item ?: (i + 1).takeIf { saved.size > 1 }
+            val name = if (number != null) "$base $number.$ext" else "$base.$ext"
             File(workDir, name).also { file.renameTo(it) }
         }
     }
@@ -301,6 +307,7 @@ class DownloadService : Service() {
         outputType = getStringExtra(EXTRA_OUTPUT_TYPE) ?: return null,
         targetDir = getStringExtra(EXTRA_TARGET_DIR) ?: return null,
         title = getStringExtra(EXTRA_TITLE),
+        item = getIntExtra(EXTRA_ITEM, 0).takeIf { it > 0 },
     )
 
     companion object {
@@ -320,6 +327,7 @@ class DownloadService : Service() {
         private const val EXTRA_OUTPUT_TYPE = "outputType"
         private const val EXTRA_TARGET_DIR = "targetDir"
         private const val EXTRA_TITLE = "title"
+        private const val EXTRA_ITEM = "item"
 
         private const val MAX_PARALLEL = 2
         private const val EVENT_INTERVAL_MS = 250L
@@ -351,6 +359,7 @@ class DownloadService : Service() {
                 .putExtra(EXTRA_OUTPUT_TYPE, request.outputType)
                 .putExtra(EXTRA_TARGET_DIR, request.targetDir)
                 .putExtra(EXTRA_TITLE, request.title)
+                .putExtra(EXTRA_ITEM, request.item ?: 0)
             ContextCompat.startForegroundService(context, intent)
         }
 

@@ -10,6 +10,7 @@ import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/router/app_router.dart';
 import 'package:media_downloader/core/theme/motion.dart';
+import 'package:media_downloader/core/widgets/page_header.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
@@ -38,6 +39,7 @@ class LibraryScreen extends ConsumerWidget {
     // Ids of files deleted meanwhile drop out here.
     final selected = [...?shown?.where((item) => selection.contains(item.id))];
     final selecting = selected.isNotEmpty;
+    final side = PageLayout.gutter(context);
 
     final List<Widget> content;
     if (list == null) {
@@ -78,7 +80,7 @@ class LibraryScreen extends ConsumerWidget {
             ),
           ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: EdgeInsets.fromLTRB(side, 8, side, 24),
           sliver: SliverList.list(
             children: [
               if (active.isNotEmpty && !filter.searching) ...[
@@ -156,11 +158,10 @@ class LibraryScreen extends ConsumerWidget {
             else if (filter.searching)
               const SliverAppBar(pinned: true, title: _SearchField())
             else
-              SliverAppBar.large(
-                title: Text(
-                  l10n.navLibrary,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
+              SliverAppBar(
+                pinned: true,
+                titleSpacing: side,
+                title: const BrandTitle(),
                 actions: [
                   if (list?.isNotEmpty ?? false)
                     IconButton(
@@ -170,8 +171,18 @@ class LibraryScreen extends ConsumerWidget {
                           .read(libraryFilterStateProvider.notifier)
                           .openSearch,
                     ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: side - 8),
                 ],
+              ),
+            if (!selecting && !filter.searching)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(side, 12, side, 0),
+                sliver: SliverToBoxAdapter(
+                  child: PageHeader(
+                    title: l10n.libraryTitle,
+                    subtitle: l10n.libraryHint,
+                  ),
+                ),
               ),
             ...content,
           ],
@@ -352,7 +363,10 @@ class _Filters extends ConsumerWidget {
       height: (56 * MediaQuery.textScalerOf(context).scale(1)).clamp(56, 96),
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: PageLayout.gutter(context),
+          vertical: 8,
+        ),
         children: [
           _Chip(
             label: l10n.libraryFilterAll,
