@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/errors/failure_message.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
+import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
-import 'package:media_downloader/features/library/domain/library_repository.dart';
+import 'package:media_downloader/features/library/presentation/library_actions.dart';
+import 'package:media_downloader/features/library/presentation/library_providers.dart';
 import 'package:media_downloader/features/library/presentation/widgets/library_thumbnail.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
@@ -27,69 +29,101 @@ extension on LibraryItem {
 }
 
 /// One saved file: tap to open it; More opens a sheet to share, copy the
-/// link or delete it.
+/// link or delete it. A long press starts selecting several files; while
+/// [selecting], a tap picks or unpicks the file instead.
 class LibraryTile extends ConsumerWidget {
-  const new({required this.item, super.key});
+  const new({required this.item, this.selecting = false, super.key});
 
   final LibraryItem item;
+  final bool selecting;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final selected = ref.watch(
+      librarySelectionProvider.select((ids) => ids.contains(item.id)),
+    );
     final details = [
       item.platform.label(l10n),
       item.kind(l10n),
       if (item.sizeBytes case final size?) formatByteSize(size, l10n),
     ].join(' · ');
 
-    return Card(
-      color: scheme.surfaceContainer,
-      child: InkWell(
-        onTap: () => _run(context, ref, (repository) => repository.open(item)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-          child: Row(
-            children: [
-              LibraryThumbnail(
-                type: item.type,
-                fileUri: item.fileUri,
-                thumbnailUrl: item.thumbnailUrl,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      details,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
+    void toggle() {
+      unawaited(HapticFeedback.selectionClick());
+      ref.read(librarySelectionProvider.notifier).toggle(item.id);
+    }
+
+    return Semantics(
+      selected: selecting ? selected : null,
+      child: Card(
+        color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+        child: InkWell(
+          onTap: selecting ? toggle : () => _open(context, ref),
+          onLongPress: toggle,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+            child: Row(
+              children: [
+                LibraryThumbnail(
+                  type: item.type,
+                  fileUri: item.fileUri,
+                  thumbnailUrl: item.thumbnailUrl,
                 ),
-              ),
-              IconButton(
-                tooltip: l10n.libraryMore,
-                icon: const Icon(Icons.more_vert_rounded),
-                color: scheme.onSurfaceVariant,
-                onPressed: () => _showActions(context, ref),
-              ),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        details,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: AppMotion.durationOf(context),
+                  switchInCurve: AppMotion.standard,
+                  child: selecting
+                      ? Padding(
+                          key: const ValueKey('check'),
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            selected
+                                ? Icons.check_circle_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: selected
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant,
+                          ),
+                        )
+                      : IconButton(
+                          key: const ValueKey('more'),
+                          tooltip: l10n.libraryMore,
+                          icon: const Icon(Icons.more_vert_rounded),
+                          color: scheme.onSurfaceVariant,
+                          onPressed: () => _showActions(context, ref),
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -104,9 +138,9 @@ class LibraryTile extends ConsumerWidget {
     if (action == null || !context.mounted) return;
     switch (action) {
       case _Action.open:
-        await _run(context, ref, (repository) => repository.open(item));
+        await _open(context, ref);
       case _Action.share:
-        await _run(context, ref, (repository) => repository.share(item));
+        await shareLibraryItems(context, ref, [item]);
       case _Action.copyLink:
         final messenger = ScaffoldMessenger.of(context);
         final copied = context.l10n.libraryLinkCopied;
@@ -114,57 +148,17 @@ class LibraryTile extends ConsumerWidget {
         unawaited(HapticFeedback.lightImpact());
         messenger.showSnackBar(SnackBar(content: Text(copied)));
       case _Action.delete:
-        await _delete(context, ref);
+        await deleteLibraryItems(context, ref, [item]);
     }
   }
 
-  /// Runs [call] and reports a failure in a snack bar.
-  Future<void> _run(
-    BuildContext context,
-    WidgetRef ref,
-    Future<Result<void>> Function(LibraryRepository) call,
-  ) async {
+  /// Opens the file; reports a failure in a snack bar.
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
-    final result = await call(ref.read(libraryRepositoryProvider));
+    final result = await ref.read(libraryRepositoryProvider).open(item);
     if (result case Err(:final failure)) {
       messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
-    }
-  }
-
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
-    // The tile goes away once the file is deleted; keep what's needed after.
-    final messenger = ScaffoldMessenger.of(context);
-    final repository = ref.read(libraryRepositoryProvider);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.libraryDeleteTitle),
-        content: Text(l10n.libraryDeleteBody(item.title)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: scheme.error),
-            child: Text(l10n.libraryDelete),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    unawaited(HapticFeedback.mediumImpact());
-    switch (await repository.delete(item)) {
-      case Ok(value: true):
-        messenger.showSnackBar(SnackBar(content: Text(l10n.libraryDeleted)));
-      case Ok():
-        break;
-      case Err(:final failure):
-        messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
     }
   }
 }

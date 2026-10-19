@@ -1,9 +1,12 @@
 package com.snehangshu.magpie
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
+import android.os.Bundle
 import com.snehangshu.magpie.engine.YtDlpBridge
+import com.snehangshu.magpie.share.ShareBridge
 import com.snehangshu.magpie.storage.StorageBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -14,10 +17,13 @@ import kotlinx.coroutines.withContext
 class MainActivity : FlutterActivity(), ActivityHost {
     private var engineBridge: YtDlpBridge? = null
     private var storageBridge: StorageBridge? = null
+    private val shareBridge = ShareBridge()
+    private var appearanceBridge: AppearanceBridge? = null
 
     // Permission prompts and system confirmations waiting for their result, by request code.
     private val pendingPermissions = mutableMapOf<Int, CompletableDeferred<Unit>>()
     private val pendingConfirmations = mutableMapOf<Int, CompletableDeferred<Boolean>>()
+    private val pendingPicks = mutableMapOf<Int, CompletableDeferred<Intent?>>()
     private var nextRequestCode = 1
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -25,6 +31,19 @@ class MainActivity : FlutterActivity(), ActivityHost {
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         engineBridge = YtDlpBridge(applicationContext, this).also { it.attach(messenger) }
         storageBridge = StorageBridge(applicationContext, this).also { it.attach(messenger) }
+        shareBridge.attach(messenger)
+        appearanceBridge = AppearanceBridge(applicationContext).also { it.attach(messenger) }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // A recreated activity still holds the intent it was first opened with.
+        if (savedInstanceState == null) shareBridge.handle(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        shareBridge.handle(intent)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -32,6 +51,9 @@ class MainActivity : FlutterActivity(), ActivityHost {
         engineBridge = null
         storageBridge?.detach()
         storageBridge = null
+        shareBridge.detach()
+        appearanceBridge?.detach()
+        appearanceBridge = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 
@@ -41,6 +63,8 @@ class MainActivity : FlutterActivity(), ActivityHost {
         pendingPermissions.clear()
         pendingConfirmations.values.forEach { it.complete(false) }
         pendingConfirmations.clear()
+        pendingPicks.values.forEach { it.complete(null) }
+        pendingPicks.clear()
         super.onDestroy()
     }
 
@@ -73,6 +97,23 @@ class MainActivity : FlutterActivity(), ActivityHost {
 
     override fun launch(intent: Intent) = startActivity(intent)
 
+    override suspend fun pick(intent: Intent): Intent? {
+        val answered = withContext(Dispatchers.Main) {
+            if (isFinishing) return@withContext null
+            val code = nextRequestCode++
+            CompletableDeferred<Intent?>().also {
+                pendingPicks[code] = it
+                try {
+                    startActivityForResult(intent, code)
+                } catch (e: ActivityNotFoundException) {
+                    pendingPicks.remove(code)
+                    throw e
+                }
+            }
+        }
+        return answered?.await()
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -86,5 +127,6 @@ class MainActivity : FlutterActivity(), ActivityHost {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         pendingConfirmations.remove(requestCode)?.complete(resultCode == RESULT_OK)
+        pendingPicks.remove(requestCode)?.complete(data.takeIf { resultCode == RESULT_OK })
     }
 }

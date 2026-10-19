@@ -1,6 +1,7 @@
 package com.snehangshu.magpie.engine
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -26,7 +27,13 @@ internal object DownloadResults {
         val events = prefs.all.values.mapNotNull { value ->
             runCatching {
                 val json = JSONObject(value as String)
-                json.keys().asSequence().associateWith { json.get(it) }
+                json.keys().asSequence().associateWith { key ->
+                    when (val value = json.get(key)) {
+                        // filePaths: the channel can't send a JSONArray.
+                        is JSONArray -> List(value.length()) { value.get(it) }
+                        else -> value
+                    }
+                }
             }.getOrNull()
         }
         prefs.edit().clear().commit()

@@ -98,20 +98,6 @@ LinkKind _kindOf(SourcePlatform platform, String host, Uri uri) {
         };
       }
       return LinkKind.unknown;
-    case SourcePlatform.tiktok:
-      if (has('photo')) return LinkKind.post;
-      // vm.tiktok.com / vt.tiktok.com short links point at a video.
-      if (has('video') || host.startsWith('vm.') || host.startsWith('vt.')) {
-        return LinkKind.video;
-      }
-      return LinkKind.unknown;
-    case SourcePlatform.vimeo:
-      return path.isEmpty ? LinkKind.unknown : LinkKind.video;
-    case SourcePlatform.soundcloud:
-      if (has('sets')) return LinkKind.playlist;
-      return path.length >= 2 || host.startsWith('on.')
-          ? LinkKind.track
-          : LinkKind.unknown;
     case SourcePlatform.other:
       return LinkKind.unknown;
   }

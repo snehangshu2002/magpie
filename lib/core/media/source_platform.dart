@@ -7,9 +7,6 @@ enum SourcePlatform {
   x('X'),
   reddit('Reddit'),
   facebook('Facebook'),
-  tiktok('TikTok'),
-  vimeo('Vimeo'),
-  soundcloud('SoundCloud'),
   other(null);
 
   new(this.brandName);
@@ -26,7 +23,12 @@ enum SourcePlatform {
   };
 
   /// Sites people mostly use for music, where audio is the better default.
-  bool get prefersAudio => this == youtubeMusic || this == soundcloud;
+  bool get prefersAudio => this == youtubeMusic;
+
+  /// Sites with photo posts, which yt-dlp reports as items without formats
+  /// (the photo is the item's thumbnail). Elsewhere such an item has nothing
+  /// to save (e.g. DRM or a stream that hasn't started).
+  bool get hasPhotoPosts => this == instagram;
 
   /// Matches a link's host, e.g. `youtu.be` or `old.reddit.com`.
   static SourcePlatform fromHost(String host) {
@@ -41,25 +43,19 @@ enum SourcePlatform {
     if (on('x.com') || on('twitter.com')) return x;
     if (on('reddit.com') || on('redd.it')) return reddit;
     if (on('facebook.com') || on('fb.watch') || on('fb.com')) return facebook;
-    if (on('tiktok.com')) return tiktok;
-    if (on('vimeo.com')) return vimeo;
-    if (on('soundcloud.com')) return soundcloud;
     return other;
   }
 
   /// Maps yt-dlp's raw extractor name (`youtube`, `youtube:tab`, `twitter`,
-  /// `vm.tiktok`, `Instagram`, …) to a platform.
+  /// `Instagram`, …) to a platform.
   static SourcePlatform fromExtractor(String extractor) {
     final key = extractor.toLowerCase().split(':').first;
-    if (key.contains('tiktok')) return tiktok;
     return switch (key) {
       'youtube' => youtube,
       'instagram' => instagram,
       'twitter' => x,
       'reddit' => reddit,
       'facebook' => facebook,
-      'vimeo' => vimeo,
-      'soundcloud' => soundcloud,
       _ => other,
     };
   }

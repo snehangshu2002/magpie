@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's page colour (AppTheme surface), so launch and app look the same. -->
+    <color name="launch_background">#F6FBEF</color>
+</resources>

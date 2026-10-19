@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -134,6 +136,27 @@ void main() {
     expect(await library.watchItems().first, isEmpty);
   });
 
+  test(
+    'a file deleted while a sync runs is forgotten by a second run',
+    () async {
+      await download('saved');
+      storage = fileExists;
+      await library.sync();
+
+      // The first run looks before the file is deleted.
+      final lookup = Completer<Object?>();
+      storage = (call) => call.method == 'queryFiles' ? lookup.future : null;
+      final first = library.sync();
+      await pumpEventQueue();
+      final second = library.sync();
+      storage = (call) => call.method == 'queryFiles' ? <Object?>[] : null;
+      lookup.complete(fileExists(const MethodCall('queryFiles')));
+      await Future.wait([first, second]);
+
+      expect(await library.watchItems().first, isEmpty);
+    },
+  );
+
   test('a failed lookup keeps the files', () async {
     await download('saved');
     storage = (_) => throw PlatformException(code: 'UNKNOWN');
@@ -154,5 +177,43 @@ void main() {
     expect(result, isA<Err<void>>());
     expect((result as Err<void>).failure, isA<NotFoundFailure>());
     expect(await library.watchItems().first, isEmpty);
+  });
+
+  test('deleting forgets only the files that are gone', () async {
+    await download('saved');
+    storage = fileExists;
+    await library.sync();
+    final item = (await library.watchItems().first).single;
+
+    // The user declined the system prompt: nothing deleted, nothing forgotten.
+    storage = (call) => call.method == 'deleteFiles' ? <Object?>[] : null;
+    expect(
+      await library.delete([item]),
+      isA<Ok<int>>().having((r) => r.value, 'value', 0),
+    );
+    expect(await library.watchItems().first, hasLength(1));
+
+    Object? asked;
+    storage = (call) {
+      asked = call.arguments;
+      return call.method == 'deleteFiles' ? [_uri] : null;
+    };
+    expect(
+      await library.delete([item]),
+      isA<Ok<int>>().having((r) => r.value, 'value', 1),
+    );
+    expect(asked, {
+      'uris': [_uri],
+    });
+    expect(await library.watchItems().first, isEmpty);
+  });
+
+  test('files shared together get one type that covers them all', () {
+    expect(sharedMimeType(['video/mp4']), 'video/mp4');
+    expect(sharedMimeType(['video/mp4', 'video/mp4']), 'video/mp4');
+    expect(sharedMimeType(['video/mp4', 'video/webm']), 'video/*');
+    expect(sharedMimeType(['video/mp4', 'image/jpeg']), '*/*');
+    expect(sharedMimeType(['video/mp4', null]), '*/*');
+    expect(sharedMimeType([null]), '*/*');
   });
 }

@@ -144,44 +144,120 @@ class DownloadService : Service() {
             task.state = STATE_RUNNING
             publish(task, force = true)
 
-            val request = YoutubeDLRequest(task.request.url).apply {
-                addOption("-f", task.request.formatId)
-                addOption("-o", File(workDir, "%(title).150B.%(ext)s").absolutePath)
-                addOption("--no-playlist")
-                addOption("--no-mtime")
+            val files = if (task.request.formatId == FORMAT_POST) {
+                downloadPost(task, workDir)
+            } else {
+                listOf(downloadFormat(task, workDir))
             }
-            // "137+140" downloads two streams one after the other.
-            val streams = task.request.formatId.split('+').size
-            var stream = -1
-            YoutubeDL.getInstance().execute(request, task.id) { percent, eta, line ->
-                when {
-                    line.startsWith("[download] Destination:") -> stream++
-                    line.startsWith("[Merger]") || line.startsWith("[ExtractAudio]") ->
-                        task.state = STATE_MERGING
-                }
-                if (task.state == STATE_RUNNING && percent >= 0) {
-                    val done = stream.coerceIn(0, streams - 1) + percent / 100f
-                    task.percent = (done / streams * 100f).coerceIn(0f, 100f)
-                    task.etaSeconds = eta.takeIf { it >= 0 }
-                    task.speed = SPEED.find(line)?.groupValues?.get(1)
-                }
-                publish(task)
-            }
-
-            val file = workDir.listFiles()
-                ?.filter { it.isFile && it.extension !in TEMP_EXTENSIONS }
-                ?.maxByOrNull { it.length() }
-                ?: throw YoutubeDLException("yt-dlp finished without producing a file")
             task.state = STATE_MERGING
             task.percent = 100f
             publish(task, force = true)
 
-            val uri = MediaStoreSaver.save(this, file, task.request.targetDir)
-            task.filePath = uri.toString()
-            task.mimeType = MediaStoreSaver.mimeTypeOf(file)
+            val uris = files.map { MediaStoreSaver.save(this, it, task.request.targetDir).toString() }
+            task.filePath = uris.first()
+            task.filePaths = uris.takeIf { it.size > 1 }
+            task.mimeType = MediaStoreSaver.mimeTypeOf(files.first())
             task.state = STATE_SAVED
         } finally {
             workDir.deleteRecursively()
+        }
+    }
+
+    /** Downloads the `-f` selector of [task]; returns the finished file. */
+    private fun downloadFormat(task: DownloadTask, workDir: File): File {
+        val request = YoutubeDLRequest(task.request.url).apply {
+            addOption("-f", task.request.formatId)
+            addOption("-o", File(workDir, "%(title).150B.%(ext)s").absolutePath)
+            addOption("--no-playlist")
+            addOption("--no-mtime")
+        }
+        // "137+140" downloads two streams one after the other.
+        val streams = task.request.formatId.split('+').size
+        var stream = -1
+        YoutubeDL.getInstance().execute(request, task.id) { percent, eta, line ->
+            when {
+                line.startsWith("[download] Destination:") -> stream++
+                line.startsWith("[Merger]") || line.startsWith("[ExtractAudio]") ->
+                    task.state = STATE_MERGING
+            }
+            if (task.state == STATE_RUNNING && percent >= 0) {
+                val done = stream.coerceIn(0, streams - 1) + percent / 100f
+                task.percent = (done / streams * 100f).coerceIn(0f, 100f)
+                task.etaSeconds = eta.takeIf { it >= 0 }
+                task.speed = SPEED.find(line)?.groupValues?.get(1)
+            }
+            publish(task)
+        }
+        return workDir.listFiles()
+            ?.filter { it.isFile && it.extension !in TEMP_EXTENSIONS }
+            ?.maxByOrNull { it.length() }
+            ?: throw YoutubeDLException("yt-dlp finished without producing a file")
+    }
+
+    /**
+     * Saves every item of a post ([FORMAT_POST]): videos in the best quality,
+     * and for items without formats (photos) the image yt-dlp lists as their
+     * thumbnail. Returns the files in post order.
+     */
+    private fun downloadPost(task: DownloadTask, workDir: File): List<File> {
+        val request = YoutubeDLRequest(task.request.url).apply {
+            addOption("-f", "bv*+ba/b")
+            // Photos have no format to download: yt-dlp reports an error for
+            // each, after writing its image, and goes on with the next item.
+            addOption("--ignore-no-formats-error")
+            addOption("--ignore-errors")
+            addOption("--write-thumbnail")
+            // "<index> <id>.<ext>"; ids have no spaces.
+            addOption("-o", File(workDir, "%(playlist_index|0)s %(id)s.%(ext)s").absolutePath)
+            addOption("--no-mtime")
+        }
+        var item = 0
+        var items = 1
+        val run: () -> Unit = {
+            YoutubeDL.getInstance().execute(request, task.id) { percent, eta, line ->
+                ITEM.find(line)?.let { match ->
+                    item = match.groupValues[1].toInt() - 1
+                    items = match.groupValues[2].toInt()
+                }
+                if (line.startsWith("[Merger]")) task.state = STATE_MERGING
+                if (line.startsWith("[download] Destination:")) task.state = STATE_RUNNING
+                val done = item + (percent.takeIf { it >= 0 } ?: 0f) / 100f
+                task.percent = (done / items * 100f).coerceIn(0f, 100f)
+                task.etaSeconds = eta.takeIf { it >= 0 && items == 1 }
+                task.speed = SPEED.find(line)?.groupValues?.get(1)
+                publish(task)
+            }
+        }
+        try {
+            run()
+        } catch (e: YoutubeDLException) {
+            // Only photos' "No video formats found!" is expected; anything
+            // else (network, a video that failed) fails the whole post.
+            val unexpected = e.message.orEmpty().lines()
+                .filter { it.startsWith("ERROR:") }
+                .any { !it.contains(NO_FORMATS) }
+            if (unexpected) throw e
+        }
+
+        val files = workDir.listFiles()
+            ?.filter { it.isFile && it.extension !in TEMP_EXTENSIONS }
+            .orEmpty()
+        val saved = files.groupBy { it.name.substringBefore('.') }
+            .toSortedMap(compareBy { it.substringBefore(' ').toIntOrNull() ?: 0 })
+            // A video's thumbnail is written too; keep only the video.
+            .map { (_, group) ->
+                group.firstOrNull { MediaStoreSaver.mimeTypeOf(it).startsWith("video/") }
+                    ?: group.maxBy { it.length() }
+            }
+        if (saved.isEmpty()) throw YoutubeDLException("yt-dlp finished without producing a file")
+
+        val title = task.request.title?.let(::safeFileName)?.takeIf { it.isNotBlank() }
+        return saved.mapIndexed { i, file ->
+            // Instagram's photos are JPEGs whose URL ends in ".heic".
+            val ext = MediaStoreSaver.imageExtensionOf(file) ?: file.extension
+            val base = title ?: file.name.substringBefore('.').substringAfter(' ')
+            val name = if (saved.size > 1) "$base ${i + 1}.$ext" else "$base.$ext"
+            File(workDir, name).also { file.renameTo(it) }
         }
     }
 
@@ -249,6 +325,16 @@ class DownloadService : Service() {
         private const val EVENT_INTERVAL_MS = 250L
         private val TEMP_EXTENSIONS = setOf("part", "ytdl", "temp")
 
+        /** `startDownload` selector for every item of the link (see CLAUDE.md). */
+        private const val FORMAT_POST = "post"
+        private const val NO_FORMATS = "No video formats found"
+
+        // "[download] Downloading item 3 of 19"
+        private val ITEM = Regex("""Downloading item (\d+) of (\d+)""")
+
+        private fun safeFileName(name: String) =
+            name.replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_").trim().take(120)
+
         // "[download]  45.3% of ~ 10.00MiB at    2.31MiB/s ETA 00:03"
         private val SPEED = Regex("""\bat\s+(\S+/s)""")
 
@@ -290,6 +376,7 @@ internal class DownloadTask(val request: DownloadRequest) {
     @Volatile var etaSeconds: Long? = null
     @Volatile var speed: String? = null
     @Volatile var filePath: String? = null
+    @Volatile var filePaths: List<String>? = null
     @Volatile var mimeType: String? = null
     @Volatile var error: String? = null
 
@@ -303,6 +390,7 @@ internal class DownloadTask(val request: DownloadRequest) {
         "speed" to speed,
         "state" to state,
         "filePath" to filePath,
+        "filePaths" to filePaths,
         "error" to error,
     )
 }

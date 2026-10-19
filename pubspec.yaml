@@ -39,7 +39,6 @@ dependencies:
   go_router: ^18.1.0
   intl: ^0.20.3
   json_annotation: ^4.12.0
-  receive_sharing_intent: ^1.9.0
   riverpod_annotation: ^4.0.7
   shared_preferences: ^2.5.6
   simple_icons: ^16.23.0
@@ -71,6 +70,8 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/fonts/Inter-OFL.txt
+    - assets/fonts/SourceSerif4-OFL.txt
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -88,6 +89,25 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+    - family: SourceSerif4
+      fonts:
+        - asset: assets/fonts/SourceSerif4-Regular.ttf
+        - asset: assets/fonts/SourceSerif4-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SourceSerif4-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/SourceSerif4-Bold.ttf
+          weight: 700
   # fonts:
   #   - family: Schyler
   #     fonts:

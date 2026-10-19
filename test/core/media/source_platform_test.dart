@@ -7,7 +7,6 @@ void main() {
     expect(SourcePlatform.fromExtractor('youtube:tab'), SourcePlatform.youtube);
     expect(SourcePlatform.fromExtractor('Instagram'), SourcePlatform.instagram);
     expect(SourcePlatform.fromExtractor('twitter'), SourcePlatform.x);
-    expect(SourcePlatform.fromExtractor('vm.tiktok'), SourcePlatform.tiktok);
     expect(SourcePlatform.fromExtractor('generic'), SourcePlatform.other);
   });
 
@@ -24,7 +23,7 @@ void main() {
         for (final p in SourcePlatform.values)
           if (p.prefersAudio) p,
       ],
-      [SourcePlatform.youtubeMusic, SourcePlatform.soundcloud],
+      [SourcePlatform.youtubeMusic],
     );
   });
 }

@@ -4,11 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import com.snehangshu.magpie.ActivityHost
 import com.snehangshu.magpie.storage.StorageException
 import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.mapper.VideoFormat
-import com.yausername.youtubedl_android.mapper.VideoInfo
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -20,6 +20,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Native side of the `app/engine` channel contract (see CLAUDE.md).
@@ -68,7 +70,7 @@ class YtDlpBridge(
 
             "fetchInfo" -> respond(result) {
                 Engine.ensureInitialized(context)
-                YoutubeDL.getInstance().getInfo(call.requireString("url")).toPayload()
+                fetchInfo(call.requireString("url"))
             }
 
             "startDownload" -> respond(result) {
@@ -94,12 +96,11 @@ class YtDlpBridge(
             "takeFinishedDownloads" -> respond(result) { DownloadResults.take(context) }
 
             "updateEngine" -> respond(result) {
-                Engine.ensureInitialized(context)
                 val channel = when (call.argument<String>("channel")) {
                     "nightly" -> YoutubeDL.UpdateChannel.NIGHTLY
                     else -> YoutubeDL.UpdateChannel.STABLE
                 }
-                val status = YoutubeDL.getInstance().updateYoutubeDL(context, channel)
+                val status = Engine.update(context, channel)
                 mapOf(
                     "status" to when (status) {
                         YoutubeDL.UpdateStatus.ALREADY_UP_TO_DATE -> "alreadyUpToDate"
@@ -154,6 +155,8 @@ class YtDlpBridge(
                 throw e
             } catch (e: Exception) {
                 val error = EngineErrors.from(e)
+                // yt-dlp's own message only reaches Dart as a code; keep it in logcat.
+                Log.w(TAG, "${error.code}: ${e.message}", e)
                 result.error(error.code, error.message, null)
             }
         }
@@ -162,28 +165,68 @@ class YtDlpBridge(
     private fun MethodCall.requireString(key: String): String =
         argument<String>(key) ?: throw IllegalArgumentException("Missing argument: $key")
 
-    private fun VideoInfo.toPayload(): Map<String, Any?> = mapOf(
-        "title" to (title ?: fulltitle ?: id),
-        "thumbnail" to thumbnail,
-        "duration" to duration.takeIf { it > 0 },
-        "extractor" to extractor,
-        "formats" to formats.orEmpty().map { it.toPayload() },
-    )
+    /**
+     * yt-dlp's JSON for [url]. `-J` keeps a post with several items (an
+     * Instagram carousel) as one result with `entries`; items without formats
+     * (photos) are reported instead of failing the whole link.
+     */
+    private fun fetchInfo(url: String): Map<String, Any?> {
+        val request = YoutubeDLRequest(url).apply {
+            addOption("-J")
+            addOption("--no-playlist")
+            addOption("--ignore-no-formats-error")
+            addOption("--no-warnings")
+        }
+        val json = JSONObject(YoutubeDL.getInstance().execute(request).out)
+        val entries = json.optJSONArray("entries")?.objects()
+        return mapOf(
+            "title" to (json.string("title") ?: json.string("fulltitle") ?: json.string("id")),
+            "thumbnail" to (json.string("thumbnail") ?: entries?.firstNotNullOfOrNull { it.string("thumbnail") }),
+            "duration" to json.positiveInt("duration"),
+            "extractor" to (json.string("extractor") ?: entries?.firstNotNullOfOrNull { it.string("extractor") }),
+            "formats" to json.formatsPayload(),
+            "entries" to entries?.map {
+                mapOf(
+                    "thumbnail" to it.string("thumbnail"),
+                    "duration" to it.positiveInt("duration"),
+                    "formats" to it.formatsPayload(),
+                )
+            },
+        )
+    }
 
-    private fun VideoFormat.toPayload(): Map<String, Any?> = mapOf(
-        "formatId" to formatId,
-        "ext" to ext,
-        "width" to width.takeIf { it > 0 },
-        "height" to height.takeIf { it > 0 },
-        "fps" to fps.takeIf { it > 0 },
-        "vcodec" to vcodec,
-        "acodec" to acodec,
-        "fileSize" to (fileSize.takeIf { it > 0 } ?: fileSizeApproximate.takeIf { it > 0 }),
-        "note" to formatNote,
-    )
+    private fun JSONObject.formatsPayload(): List<Map<String, Any?>> =
+        optJSONArray("formats")?.objects().orEmpty().map {
+            mapOf(
+                "formatId" to it.string("format_id"),
+                "ext" to it.string("ext"),
+                "width" to it.positiveInt("width"),
+                "height" to it.positiveInt("height"),
+                "fps" to it.positiveInt("fps"),
+                "vcodec" to it.string("vcodec"),
+                "acodec" to it.string("acodec"),
+                "fileSize" to (it.positiveLong("filesize") ?: it.positiveLong("filesize_approx")),
+                "note" to it.string("format_note"),
+            )
+        }
+
+    private fun JSONArray.objects(): List<JSONObject> =
+        (0 until length()).mapNotNull { optJSONObject(it) }
+
+    // JSON null and missing keys both become null (optString would give "null").
+    private fun JSONObject.string(key: String): String? =
+        if (isNull(key)) null else opt(key)?.toString()
+
+    // yt-dlp writes some counts as floats (fps 29.97, duration 12.5).
+    private fun JSONObject.positiveInt(key: String): Int? =
+        (opt(key) as? Number)?.toInt()?.takeIf { it > 0 }
+
+    private fun JSONObject.positiveLong(key: String): Long? =
+        (opt(key) as? Number)?.toLong()?.takeIf { it > 0 }
 
     private companion object {
         const val METHOD_CHANNEL = "app/engine"
         const val PROGRESS_CHANNEL = "app/engine/progress"
+        const val TAG = "YtDlpBridge"
     }
 }

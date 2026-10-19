@@ -39,6 +39,25 @@ object MediaStoreSaver {
         MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase())
             ?: "application/octet-stream"
 
+    /**
+     * The extension matching [file]'s content when it is an image, else null.
+     * yt-dlp names images after their URL, which can be wrong.
+     */
+    fun imageExtensionOf(file: File): String? {
+        val head = ByteArray(12)
+        val read = file.inputStream().use { it.read(head) }
+        if (read < head.size) return null
+        fun ascii(from: Int, length: Int) = String(head, from, length, Charsets.US_ASCII)
+        return when {
+            head[0] == 0xFF.toByte() && head[1] == 0xD8.toByte() && head[2] == 0xFF.toByte() -> "jpg"
+            head[0] == 0x89.toByte() && ascii(1, 3) == "PNG" -> "png"
+            ascii(0, 4) == "RIFF" && ascii(8, 4) == "WEBP" -> "webp"
+            ascii(0, 3) == "GIF" -> "gif"
+            ascii(4, 4) == "ftyp" && ascii(8, 4) in HEIF_BRANDS -> "heic"
+            else -> null
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveToMediaStore(context: Context, file: File, relativeDir: String): Uri {
         val resolver = context.contentResolver
@@ -103,4 +122,5 @@ object MediaStoreSaver {
     }
 
     private const val SCAN_TIMEOUT_MS = 10_000L
+    private val HEIF_BRANDS = setOf("heic", "heix", "mif1", "msf1")
 }

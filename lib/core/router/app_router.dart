@@ -17,6 +17,8 @@ abstract final class AppRoutes {
 GoRouter appRouter(Ref ref) {
   final router = GoRouter(
     initialLocation: AppRoutes.intake,
+    // An unknown location (e.g. a stray deep link) lands on the Download tab.
+    onException: (context, state, router) => router.go(AppRoutes.intake),
     routes: [
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(shell: shell),

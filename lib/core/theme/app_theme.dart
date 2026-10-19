@@ -4,7 +4,8 @@ abstract final class AppTheme {
   /// Deep sage: calm, earthy, never neon.
   static const _seed = Color(0xFF56664F);
 
-  static ThemeData light() => _build(
+  /// [fontFamily] is a family from pubspec.yaml; null keeps the phone's font.
+  static ThemeData light({String? fontFamily}) => _build(
     ColorScheme.fromSeed(
       seedColor: _seed,
       dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
@@ -42,10 +43,11 @@ abstract final class AppTheme {
       inversePrimary: const Color(0xFFBACCB0),
       surfaceTint: const Color(0xFF53634C),
     ),
+    fontFamily,
   );
 
   /// Deep peat surfaces with light sage accents.
-  static ThemeData dark() => _build(
+  static ThemeData dark({String? fontFamily}) => _build(
     ColorScheme.fromSeed(
       seedColor: _seed,
       brightness: Brightness.dark,
@@ -55,6 +57,12 @@ abstract final class AppTheme {
       onPrimary: const Color(0xFF1F241D),
       error: const Color(0xFFF2B8B5),
       errorContainer: const Color(0xFF410E0B),
+      // The next five extend the Stitch peat ladder evenly (same hue family).
+      surfaceDim: const Color(0xFF121511),
+      surfaceBright: const Color(0xFF353B33),
+      surfaceContainerLowest: const Color(0xFF0D100C),
+      surfaceContainerHighest: const Color(0xFF2E352C),
+      outline: const Color(0xFF6E756A),
       surface: const Color(0xFF121511),
       onSurface: const Color(0xFFEFEBE2),
       onSurfaceVariant: const Color(0xFFA3AA9F),
@@ -63,6 +71,7 @@ abstract final class AppTheme {
       surfaceContainerHigh: const Color(0xFF252C24),
       outlineVariant: const Color(0xFF2E352C),
     ),
+    fontFamily,
   );
 
   /// Continuous corners: the curvature eases into the straight edge instead
@@ -70,8 +79,8 @@ abstract final class AppTheme {
   static RoundedSuperellipseBorder shape(double radius) =>
       RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(radius));
 
-  static ThemeData _build(ColorScheme scheme) {
-    final base = ThemeData(colorScheme: scheme);
+  static ThemeData _build(ColorScheme scheme, String? fontFamily) {
+    final base = ThemeData(colorScheme: scheme, fontFamily: fontFamily);
     final text = _tightenLargeText(base.textTheme);
     return base.copyWith(
       textTheme: text,
@@ -89,15 +98,29 @@ abstract final class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(
         showDragHandle: true,
         backgroundColor: scheme.surfaceContainerHigh,
-        dragHandleColor: scheme.outlineVariant,
+        dragHandleColor: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+        shape: const RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
       ),
+      dialogTheme: DialogThemeData(shape: shape(28)),
+      snackBarTheme: SnackBarThemeData(shape: shape(16)),
+      popupMenuTheme: PopupMenuThemeData(shape: shape(16)),
       // Hierarchy comes from tone, not shadow.
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.secondaryContainer,
-        labelTextStyle: WidgetStatePropertyAll(
-          text.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? text.labelMedium?.copyWith(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                )
+              : text.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
         ),
       ),
     );

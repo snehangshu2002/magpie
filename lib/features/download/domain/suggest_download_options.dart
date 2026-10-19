@@ -13,13 +13,20 @@ const _audioExts = {'m4a', 'mp3', 'opus', 'ogg', 'oga', 'aac', 'flac', 'wav'};
 
 /// Turns yt-dlp's raw format list into the few choices people care about
 /// (one per video quality, one per audio container, images) and picks the
-/// one that fits the link best. Returns null when nothing is downloadable.
+/// one that fits the link best. A post with several items, or a photo post,
+/// gets a single option that saves all of it. Returns null when nothing is
+/// downloadable.
 DownloadOptions? suggestDownloadOptions(
   MediaInfo info, {
   required SourcePlatform platform,
   int maxQuality = defaultMaxQuality,
   bool preferAudioForMusic = true,
 }) {
+  final entries =
+      info.entries ??
+      (info.formats.isEmpty ? [MediaEntry(thumbnail: info.thumbnail)] : null);
+  if (entries != null) return _postOptions(entries, platform, maxQuality);
+
   final videos = <_Indexed>[];
   final audios = <_Indexed>[];
   final images = <_Indexed>[];
@@ -241,4 +248,43 @@ List<DownloadOption> _imageOptions(List<_Indexed> images) {
         sizeBytes: f.fileSize,
       ),
   ];
+}
+
+DownloadOptions? _postOptions(
+  List<MediaEntry> entries,
+  SourcePlatform platform,
+  int maxQuality,
+) {
+  var photos = 0;
+  var videos = 0;
+  for (final e in entries) {
+    if (e.formats.isNotEmpty) {
+      videos++;
+    } else if (platform.hasPhotoPosts && e.thumbnail != null) {
+      photos++;
+    }
+  }
+  final count = photos + videos;
+  if (count == 0) return null;
+
+  final type = videos == 0 ? OutputType.image : OutputType.video;
+  final option = DownloadOption(
+    type: type,
+    formatSelector: postSelector,
+    // Instagram serves photos as JPEG; the engine names files by content.
+    ext: videos == 0 ? 'jpg' : null,
+    count: count,
+  );
+  return DownloadOptions(
+    video: type == OutputType.video ? [option] : const [],
+    audio: const [],
+    image: type == OutputType.image ? [option] : const [],
+    recommendedType: type,
+    reason: count > 1
+        ? RecommendationReason.wholePost
+        : type == OutputType.image
+        ? RecommendationReason.imageOnly
+        : RecommendationReason.bestUpToCap,
+    maxQuality: maxQuality,
+  );
 }

@@ -5,24 +5,31 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/errors/failure_message.dart';
-import 'package:media_downloader/core/platform/models/engine_update_result.dart';
 import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
-import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/settings/domain/app_settings.dart';
-import 'package:media_downloader/features/settings/presentation/engine_version_provider.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
-extension EngineReleaseChannelLabel on EngineReleaseChannel {
+extension AppearanceModeLabel on AppearanceMode {
   String label(AppLocalizations l10n) => switch (this) {
-    EngineReleaseChannel.stable => l10n.channelStable,
-    EngineReleaseChannel.nightly => l10n.channelNightly,
+    AppearanceMode.system => l10n.themeSystem,
+    AppearanceMode.light => l10n.themeLight,
+    AppearanceMode.dark => l10n.themeDark,
+  };
+}
+
+extension AppFontLabel on AppFont {
+  String label(AppLocalizations l10n) => switch (this) {
+    AppFont.system => l10n.fontSystem,
+    AppFont.sans => l10n.fontSans,
+    AppFont.serif => l10n.fontSerif,
   };
 
   String hint(AppLocalizations l10n) => switch (this) {
-    EngineReleaseChannel.stable => l10n.channelStableHint,
-    EngineReleaseChannel.nightly => l10n.channelNightlyHint,
+    AppFont.system => l10n.fontSystemHint,
+    AppFont.sans => l10n.fontSansHint,
+    AppFont.serif => l10n.fontSerifHint,
   };
 }
 
@@ -37,30 +44,6 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     final controller = ref.read(settingsProvider.notifier);
 
-    ref.listen(engineUpdaterProvider, (_, next) {
-      final message = switch (next) {
-        AsyncData(
-          value: EngineUpdateResult(
-            status: EngineUpdateStatus.done,
-            :final version,
-          ),
-        ) =>
-          l10n.settingsEngineUpdated(version),
-        AsyncData(
-          value: EngineUpdateResult(status: EngineUpdateStatus.alreadyUpToDate),
-        ) =>
-          l10n.settingsEngineUpToDate,
-        AsyncError(error: final Failure failure) => failure.message(l10n),
-        AsyncError() => l10n.failureUnknown,
-        _ => null,
-      };
-      if (message != null) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(message)));
-      }
-    });
-
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -74,6 +57,51 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             sliver: SliverList.list(
               children: [
+                SectionLabel(l10n.settingsAppearance),
+                _Group(
+                  children: [
+                    _SettingTile(
+                      title: l10n.settingsTheme,
+                      value: settings.appearance.label(l10n),
+                      onTap: () async {
+                        final mode = await _choose(
+                          context,
+                          title: l10n.settingsTheme,
+                          values: AppearanceMode.values,
+                          selected: settings.appearance,
+                          label: (m) => m.label(l10n),
+                        );
+                        if (mode != null) {
+                          await controller.change(
+                            (s) => s.copyWith(appearance: mode),
+                          );
+                        }
+                      },
+                    ),
+                    _SettingTile(
+                      title: l10n.settingsFont,
+                      value: settings.font.label(l10n),
+                      onTap: () async {
+                        final font = await _choose(
+                          context,
+                          title: l10n.settingsFont,
+                          values: AppFont.values,
+                          selected: settings.font,
+                          label: (f) => f.label(l10n),
+                          hint: (f) => f.hint(l10n),
+                          // Each choice is shown in its own font.
+                          style: (f) => TextStyle(fontFamily: f.family),
+                        );
+                        if (font != null) {
+                          await controller.change(
+                            (s) => s.copyWith(font: font),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
                 SectionLabel(l10n.settingsDownloads),
                 _Group(
                   children: [
@@ -111,37 +139,16 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingTile(
                       icon: Icons.folder_outlined,
                       title: l10n.settingsSaveLocation,
-                      subtitle: l10n.settingsSaveLocationPath(saveRoot),
+                      subtitle: l10n.settingsSaveLocationHint(
+                        settings.saveFolder,
+                      ),
+                      onTap: () => _pickSaveFolder(context, ref),
                     ),
                   ],
                 ),
                 const SizedBox(height: 28),
-                SectionLabel(l10n.settingsEngine),
-                _Group(
-                  children: [
-                    const _EngineVersionTile(),
-                    _SettingTile(
-                      title: l10n.settingsUpdateChannel,
-                      subtitle: l10n.settingsUpdateChannelHint,
-                      value: settings.engineChannel.label(l10n),
-                      onTap: () async {
-                        final channel = await _choose(
-                          context,
-                          title: l10n.settingsUpdateChannel,
-                          values: EngineReleaseChannel.values,
-                          selected: settings.engineChannel,
-                          label: (c) => c.label(l10n),
-                          hint: (c) => c.hint(l10n),
-                        );
-                        if (channel != null) {
-                          await controller.change(
-                            (s) => s.copyWith(engineChannel: channel),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
+                SectionLabel(l10n.settingsUpdates),
+                const _Group(children: [_AutoUpdateTile()]),
                 const SizedBox(height: 28),
                 SectionLabel(l10n.settingsAbout),
                 _Group(
@@ -205,6 +212,35 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  /// Opens the folder picker and says how it went.
+  static Future<void> _pickSaveFolder(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final String? message;
+    try {
+      message = switch (await ref
+          .read(settingsProvider.notifier)
+          .pickSaveFolder()) {
+        SaveFolderPick.changed => l10n.saveFolderChanged(
+          ref.read(settingsProvider).value?.saveFolder ?? '',
+        ),
+        SaveFolderPick.outsideDownload => l10n.saveFolderOutsideDownload,
+        SaveFolderPick.cancelled => null,
+      };
+    } on Failure catch (failure) {
+      messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
+      return;
+    }
+    if (message == null) return;
+    unawaited(HapticFeedback.selectionClick());
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   static void _toggleAudio(Settings controller, bool value) {
     unawaited(HapticFeedback.selectionClick());
     unawaited(controller.change((s) => s.copyWith(preferAudioForMusic: value)));
@@ -218,6 +254,7 @@ class SettingsScreen extends ConsumerWidget {
     required T selected,
     required String Function(T) label,
     String Function(T)? hint,
+    TextStyle? Function(T)? style,
   }) => showModalBottomSheet<T>(
     context: context,
     builder: (context) {
@@ -238,8 +275,10 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   selected: value == selected,
-                  title: Text(label(value)),
-                  subtitle: hint == null ? null : Text(hint(value)),
+                  title: Text(label(value), style: style?.call(value)),
+                  subtitle: hint == null
+                      ? null
+                      : Text(hint(value), style: style?.call(value)),
                   trailing: value == selected
                       ? Icon(Icons.check_rounded, color: scheme.primary)
                       : null,
@@ -256,56 +295,46 @@ class SettingsScreen extends ConsumerWidget {
   );
 }
 
-/// The installed yt-dlp version, with a button to update it.
-class _EngineVersionTile extends ConsumerWidget {
+/// Updates happen by themselves at launch; this only says how the last one
+/// went, and offers to try again when it failed.
+class _AutoUpdateTile extends ConsumerWidget {
   const new();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final version = ref.watch(engineVersionProvider);
-    final updating = ref.watch(engineUpdaterProvider).isLoading;
     final scheme = Theme.of(context).colorScheme;
+    final update = ref.watch(engineAutoUpdateProvider);
 
     return _SettingTile(
-      title: l10n.settingsEngineVersion,
-      subtitle: switch (version) {
-        AsyncData(:final value) => value ?? l10n.settingsEngineBundled,
-        AsyncError(error: final Failure failure) => failure.message(l10n),
-        AsyncError() => l10n.failureUnknown,
-        _ => l10n.loading,
+      icon: Icons.autorenew_rounded,
+      title: l10n.settingsAutoUpdate,
+      subtitle: switch (update) {
+        AsyncLoading() => l10n.settingsAutoUpdateChecking,
+        AsyncError() => l10n.settingsAutoUpdateFailed,
+        _ => l10n.settingsAutoUpdateDone,
       },
-      trailing: version.hasError
-          ? IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: l10n.retry,
-              onPressed: () => ref.invalidate(engineVersionProvider),
-            )
-          : FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: scheme.primaryContainer,
-                foregroundColor: scheme.onPrimaryContainer,
-              ),
-              // Stays enabled while updating so it keeps its colour; the
-              // spinner says it's busy.
-              onPressed: version.hasValue
-                  ? () {
-                      if (updating) return;
-                      unawaited(HapticFeedback.lightImpact());
-                      unawaited(ref.read(engineUpdaterProvider.notifier).run());
-                    }
-                  : null,
-              icon: updating
-                  ? SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: scheme.onPrimaryContainer,
-                      ),
-                    )
-                  : const Icon(Icons.sync_rounded, size: 18),
-              label: Text(l10n.settingsEngineUpdate),
-            ),
+      trailing: switch (update) {
+        AsyncLoading() => SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: scheme.primary,
+          ),
+        ),
+        AsyncError() => FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.primaryContainer,
+            foregroundColor: scheme.onPrimaryContainer,
+          ),
+          onPressed: () {
+            unawaited(HapticFeedback.lightImpact());
+            ref.invalidate(engineAutoUpdateProvider);
+          },
+          child: Text(l10n.retry),
+        ),
+        _ => Icon(Icons.check_circle_rounded, color: scheme.primary),
+      },
     );
   }
 }

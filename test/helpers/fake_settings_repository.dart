@@ -8,6 +8,9 @@ class FakeSettingsRepository implements SettingsRepository {
 
   AppSettings settings;
 
+  /// What the folder picker returns next.
+  Result<String?> pickedFolder = const Ok(null);
+
   @override
   Future<AppSettings> load() async => settings;
 
@@ -16,4 +19,7 @@ class FakeSettingsRepository implements SettingsRepository {
     this.settings = settings;
     return const Ok(null);
   }
+
+  @override
+  Future<Result<String?>> pickFolder() async => pickedFolder;
 }

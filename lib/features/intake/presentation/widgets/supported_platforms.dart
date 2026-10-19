@@ -13,11 +13,8 @@ class SupportedPlatforms extends StatelessWidget {
     SourcePlatform.youtube,
     SourcePlatform.instagram,
     SourcePlatform.x,
-    SourcePlatform.tiktok,
     SourcePlatform.reddit,
     SourcePlatform.facebook,
-    SourcePlatform.vimeo,
-    SourcePlatform.soundcloud,
   ];
 
   static const _columns = 4;

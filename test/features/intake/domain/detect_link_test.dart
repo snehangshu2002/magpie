@@ -134,7 +134,7 @@ void main() {
       );
     });
 
-    test('Facebook, TikTok, Vimeo, SoundCloud', () {
+    test('Facebook', () {
       expectLink(
         'https://fb.watch/abc/',
         SourcePlatform.facebook,
@@ -144,27 +144,6 @@ void main() {
         'https://www.facebook.com/share/r/abc/',
         SourcePlatform.facebook,
         LinkKind.reel,
-      );
-      expectLink(
-        'https://vm.tiktok.com/abc/',
-        SourcePlatform.tiktok,
-        LinkKind.video,
-      );
-      expectLink(
-        'https://www.tiktok.com/@someone/video/1',
-        SourcePlatform.tiktok,
-        LinkKind.video,
-      );
-      expectLink('https://vimeo.com/1', SourcePlatform.vimeo, LinkKind.video);
-      expectLink(
-        'https://soundcloud.com/artist/track',
-        SourcePlatform.soundcloud,
-        LinkKind.track,
-      );
-      expectLink(
-        'https://soundcloud.com/artist/sets/album',
-        SourcePlatform.soundcloud,
-        LinkKind.playlist,
       );
     });
 

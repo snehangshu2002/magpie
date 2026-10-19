@@ -29,6 +29,10 @@ class LibraryRepositoryImpl implements LibraryRepository {
   /// The running [sync], so overlapping calls share it.
   Future<Result<void>>? _syncing;
 
+  /// Set when [sync] is called while it runs: files may have changed after
+  /// the running one looked, so it goes once more.
+  var _syncAgain = false;
+
   $DownloadRecordsTable get _records => _db.downloadRecords;
 
   @override
@@ -108,8 +112,29 @@ class LibraryRepositoryImpl implements LibraryRepository {
       _engine.progress.where((event) => !event.state.isActive);
 
   @override
-  Future<Result<void>> sync() =>
-      _syncing ??= _sync().whenComplete(() => _syncing = null);
+  Stream<void> get filesChanged => _storage.changes;
+
+  @override
+  Future<Result<void>> sync() {
+    if (_syncing case final running?) {
+      _syncAgain = true;
+      return running;
+    }
+    return _syncing = _syncUntilSettled();
+  }
+
+  Future<Result<void>> _syncUntilSettled() async {
+    try {
+      Result<void> result;
+      do {
+        _syncAgain = false;
+        result = await _sync();
+      } while (_syncAgain);
+      return result;
+    } finally {
+      _syncing = null;
+    }
+  }
 
   Future<Result<void>> _sync() async {
     final finished = await guardPlatformCall(_engine.takeFinishedDownloads);
@@ -161,13 +186,36 @@ class LibraryRepositoryImpl implements LibraryRepository {
   Future<void> _apply(DownloadProgress event) async {
     final row = _records.id.equals(event.id);
     if (event.state == DownloadState.saved && event.filePath != null) {
-      await (_db.update(_records)..where((_) => row)).write(
-        DownloadRecordsCompanion(
-          state: Value(DownloadState.saved.name),
-          fileUri: Value(event.filePath),
-          completedAt: Value(DateTime.now()),
-        ),
+      final saved = DownloadRecordsCompanion(
+        state: Value(DownloadState.saved.name),
+        fileUri: Value(event.filePath),
+        completedAt: Value(DateTime.now()),
       );
+      await (_db.update(_records)..where((_) => row)).write(saved);
+      // A post saved several files: one Library entry each, like the
+      // first. Size and type are filled in by the next sync.
+      final more = event.filePaths?.skip(1) ?? const <String>[];
+      if (more.isEmpty) return;
+      final first = await (_db.select(
+        _records,
+      )..where((_) => row)).getSingleOrNull();
+      if (first == null) return;
+      await _db.batch((batch) {
+        for (final (i, uri) in more.indexed) {
+          batch.insert(
+            _records,
+            first
+                .toCompanion(false)
+                .copyWith(
+                  id: Value('${event.id}-${i + 2}'),
+                  fileUri: Value(uri),
+                  sizeBytes: const Value(null),
+                  mimeType: const Value(null),
+                ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
     } else if (!event.state.isActive) {
       await (_db.delete(_records)..where((_) => row)).go();
     }
@@ -186,45 +234,56 @@ class LibraryRepositoryImpl implements LibraryRepository {
 
   @override
   Future<Result<void>> open(LibraryItem item) => _forgetIfMissing(
-    item,
+    [item],
     guardPlatformCall(
       () => _storage.openFile(item.fileUri, mimeType: item.mimeType),
     ),
   );
 
   @override
-  Future<Result<void>> share(LibraryItem item) => _forgetIfMissing(
-    item,
+  Future<Result<void>> share(List<LibraryItem> items) => _forgetIfMissing(
+    items,
     guardPlatformCall(
-      () => _storage.shareFile(
-        item.fileUri,
-        mimeType: item.mimeType,
-        title: item.title,
+      () => _storage.shareFiles(
+        [for (final item in items) item.fileUri],
+        mimeType: sharedMimeType([for (final item in items) item.mimeType]),
+        title: items.length == 1 ? items.single.title : null,
       ),
     ),
   );
 
   @override
-  Future<Result<bool>> delete(LibraryItem item) async {
+  Future<Result<int>> delete(List<LibraryItem> items) async {
     final result = await guardPlatformCall(
-      () => _storage.deleteFile(item.fileUri),
+      () => _storage.deleteFiles([for (final item in items) item.fileUri]),
     );
-    if (result case Ok(value: true)) await _forget(item);
-    return result;
+    switch (result) {
+      case Ok(value: final gone):
+        final deleted = [
+          for (final item in items)
+            if (gone.contains(item.fileUri)) item,
+        ];
+        await _forget(deleted);
+        return Ok(deleted.length);
+      case Err(:final failure):
+        return Err(failure);
+    }
   }
 
   /// A file deleted outside the app can't come back; drop it from the list.
+  /// Sharing fails this way only when none of [items] exist.
   Future<Result<T>> _forgetIfMissing<T>(
-    LibraryItem item,
+    List<LibraryItem> items,
     Future<Result<T>> call,
   ) async {
     final result = await call;
-    if (result case Err(failure: NotFoundFailure())) await _forget(item);
+    if (result case Err(failure: NotFoundFailure())) await _forget(items);
     return result;
   }
 
-  Future<void> _forget(LibraryItem item) =>
-      (_db.delete(_records)..where((r) => r.id.equals(item.id))).go();
+  Future<void> _forget(List<LibraryItem> items) => (_db.delete(
+    _records,
+  )..where((r) => r.id.isIn([for (final item in items) item.id]))).go();
 
   static LibraryItem _toItem(DownloadRecord r) => LibraryItem(
     id: r.id,
@@ -241,6 +300,17 @@ class LibraryRepositoryImpl implements LibraryRepository {
     sizeBytes: r.sizeBytes,
     thumbnailUrl: r.thumbnail,
   );
+}
+
+/// One MIME type covering all of [types], for sharing them together: the
+/// type itself when they all match, `video/*` when they are one kind, else
+/// `*/*`. Unknown types count as anything.
+String sharedMimeType(List<String?> types) {
+  final distinct = types.toSet();
+  if (distinct.length == 1 && distinct.single != null) return distinct.single!;
+  final kinds = {for (final type in types) type?.split('/').first};
+  if (kinds.length == 1 && kinds.single != null) return '${kinds.single}/*';
+  return '*/*';
 }
 
 @Riverpod(keepAlive: true)

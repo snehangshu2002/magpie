@@ -35,6 +35,10 @@ abstract class DownloadProgress with _$DownloadProgress {
     /// MediaStore content URI, set once [state] is `saved`.
     String? filePath,
 
+    /// Every saved file, in order, when a post saved several; the first is
+    /// [filePath].
+    List<String>? filePaths,
+
     /// One of the native error codes, set when [state] is `failed`.
     String? error,
   }) = _DownloadProgress;

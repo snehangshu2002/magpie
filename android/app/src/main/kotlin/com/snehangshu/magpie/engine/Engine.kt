@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.withLock
 /** yt-dlp and FFmpeg setup shared by [YtDlpBridge] and [DownloadService]. */
 internal object Engine {
     private val initMutex = Mutex()
+    private val updateMutex = Mutex()
     private var initialized = false
 
     /** Unpacks Python, yt-dlp and FFmpeg on first use; later calls return at once. */
@@ -19,4 +20,14 @@ internal object Engine {
             initialized = true
         }
     }
+
+    /**
+     * Updates yt-dlp from [channel]. One at a time: the launch-time update and
+     * one started from Settings would otherwise replace the same file.
+     */
+    suspend fun update(context: Context, channel: YoutubeDL.UpdateChannel) =
+        updateMutex.withLock {
+            ensureInitialized(context)
+            YoutubeDL.getInstance().updateYoutubeDL(context.applicationContext, channel)
+        }
 }

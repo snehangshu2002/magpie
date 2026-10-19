@@ -7,4 +7,8 @@ abstract interface class SettingsRepository {
   Future<AppSettings> load();
 
   Future<Result<void>> save(AppSettings settings);
+
+  /// Lets the user choose a folder. Its picker document id
+  /// (`primary:Download/Videos`), or null if they backed out.
+  Future<Result<String?>> pickFolder();
 }

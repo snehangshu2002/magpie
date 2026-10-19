@@ -103,6 +103,98 @@ void main() {
     expect(find.text('Nothing downloaded yet'), findsOneWidget);
   });
 
+  group('selecting', () {
+    final photo = LibraryItem(
+      id: 'd2',
+      title: 'Test photo',
+      platform: SourcePlatform.instagram,
+      type: OutputType.image,
+      fileUri: 'content://media/external/downloads/2',
+      sourceUrl: 'https://example.com/p/test',
+      savedAt: DateTime(2026, 10, 19),
+    );
+
+    testWidgets('a long press starts it; taps pick more; select all', (
+      tester,
+    ) async {
+      await pumpLibrary(tester, FakeLibraryRepository([_clip, photo]));
+
+      await tester.longPress(find.text('Test clip'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsOneWidget);
+      expect(find.byTooltip('More options'), findsNothing);
+
+      await tester.tap(find.text('Test photo'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+      // Everything is picked; nothing left to select.
+      expect(find.byTooltip('Select all'), findsNothing);
+
+      await tester.tap(find.text('Test photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Select all'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+    });
+
+    testWidgets('shares the picked files together', (tester) async {
+      final repository = FakeLibraryRepository([_clip, photo]);
+      await pumpLibrary(tester, repository);
+
+      await tester.longPress(find.text('Test clip'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Test photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Share'));
+      await tester.pumpAndSettle();
+
+      expect(repository.shared, ['d1', 'd2']);
+      expect(find.text('2 selected'), findsNothing);
+    });
+
+    testWidgets('deletes the picked files after asking once', (tester) async {
+      await pumpLibrary(tester, FakeLibraryRepository([_clip, photo]));
+
+      await tester.longPress(find.text('Test clip'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Test photo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete 2 files?'), findsOneWidget);
+      expect(find.text("They'll be removed from this device."), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deleted 2 files'), findsOneWidget);
+      expect(find.text('Nothing downloaded yet'), findsOneWidget);
+    });
+
+    testWidgets('close and back end it without leaving', (tester) async {
+      final repository = FakeLibraryRepository([_clip]);
+      await pumpLibrary(tester, repository);
+
+      await tester.longPress(find.text('Test clip'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Done selecting'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsNothing);
+
+      await tester.longPress(find.text('Test clip'));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsNothing);
+      expect(find.text('Test clip'), findsOneWidget);
+
+      // Not selecting: a tap opens the file again.
+      await tester.tap(find.text('Test clip'));
+      await tester.pumpAndSettle();
+      expect(repository.opened, ['d1']);
+    });
+  });
+
   testWidgets('copy link puts the source link on the clipboard', (
     tester,
   ) async {
@@ -137,7 +229,7 @@ void main() {
     final song = LibraryItem(
       id: 'd2',
       title: 'Test song',
-      platform: SourcePlatform.soundcloud,
+      platform: SourcePlatform.youtubeMusic,
       type: OutputType.audio,
       fileUri: 'content://media/external/downloads/2',
       sourceUrl: 'https://example.com/listen/test',

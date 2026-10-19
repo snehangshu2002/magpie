@@ -201,10 +201,72 @@ void main() {
       _audio('140'),
       _video('137', 1080),
       _video('313', 2160),
-    ], platform: SourcePlatform.soundcloud);
+    ], platform: SourcePlatform.youtubeMusic);
 
     expect(options.recommendedType, OutputType.audio);
     expect(options.defaultFor(OutputType.video).quality, 1080);
     expect(options.types, [OutputType.video, OutputType.audio]);
+  });
+
+  group('posts', () {
+    const photo = MediaEntry(thumbnail: 'https://example.com/photo.jpg');
+    final clip = MediaEntry(formats: [_video('v', 720, acodec: 'aac')]);
+
+    DownloadOptions? suggestPost(
+      List<MediaEntry>? entries, {
+      String? thumbnail = 'https://example.com/photo.jpg',
+      SourcePlatform platform = SourcePlatform.instagram,
+    }) => suggestDownloadOptions(
+      MediaInfo(
+        title: 'Test post',
+        extractor: 'test',
+        thumbnail: thumbnail,
+        entries: entries,
+      ),
+      platform: platform,
+    );
+
+    test('a carousel of photos is saved as one option', () {
+      final options = suggestPost([photo, photo, photo])!;
+
+      final option = options.image.single;
+      expect(option.formatSelector, postSelector);
+      expect(option.count, 3);
+      expect(option.ext, 'jpg');
+      expect(options.video, isEmpty);
+      expect(options.recommendedType, OutputType.image);
+      expect(options.reason, RecommendationReason.wholePost);
+    });
+
+    test('photos and videos together count as video', () {
+      final options = suggestPost([photo, clip])!;
+
+      expect(options.video.single.count, 2);
+      expect(options.video.single.ext, isNull);
+      expect(options.image, isEmpty);
+    });
+
+    test('a single photo post has no formats', () {
+      final options = suggestPost(null)!;
+
+      expect(options.image.single.formatSelector, postSelector);
+      expect(options.image.single.count, 1);
+      expect(options.reason, RecommendationReason.imageOnly);
+    });
+
+    test('items without formats are not photos on other sites', () {
+      expect(suggestPost(null, platform: SourcePlatform.youtube), isNull);
+      expect(
+        suggestPost([
+          photo,
+          clip,
+        ], platform: SourcePlatform.x)!.video.single.count,
+        1,
+      );
+    });
+
+    test('nothing to save without formats or a photo', () {
+      expect(suggestPost(null, thumbnail: null), isNull);
+    });
   });
 }

@@ -45,8 +45,18 @@ class FakeLibraryRepository implements LibraryRepository {
   @override
   Stream<void> get downloadsFinished => const Stream.empty();
 
+  /// Lets a test report files changed outside the app.
+  final filesChangedController = StreamController<void>.broadcast();
+  int syncs = 0;
+
   @override
-  Future<Result<void>> sync() async => const Ok(null);
+  Stream<void> get filesChanged => filesChangedController.stream;
+
+  @override
+  Future<Result<void>> sync() async {
+    syncs++;
+    return const Ok(null);
+  }
 
   @override
   Future<Uint8List?> thumbnail(String fileUri) async => null;
@@ -61,15 +71,16 @@ class FakeLibraryRepository implements LibraryRepository {
   }
 
   @override
-  Future<Result<void>> share(LibraryItem item) async {
-    shared.add(item.id);
+  Future<Result<void>> share(List<LibraryItem> items) async {
+    shared.addAll([for (final item in items) item.id]);
     return const Ok(null);
   }
 
   @override
-  Future<Result<bool>> delete(LibraryItem item) async {
-    _items.removeWhere((i) => i.id == item.id);
+  Future<Result<int>> delete(List<LibraryItem> items) async {
+    final ids = {for (final item in items) item.id};
+    _items.removeWhere((i) => ids.contains(i.id));
     _changes.add([..._items]);
-    return const Ok(true);
+    return Ok(ids.length);
   }
 }

@@ -13,6 +13,7 @@ import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// The Download button, floating on a translucent bar that content
@@ -33,6 +34,9 @@ class DownloadBar extends ConsumerWidget {
         ref.watch(selectedDownloadOptionProvider(url)) ??
         preview.options.recommended;
     final starter = ref.watch(downloadStarterProvider(url));
+    final saveFolder = ref.watch(
+      settingsProvider.select((s) => s.value?.saveFolder ?? defaultSaveFolder),
+    );
 
     ref.listen(downloadStarterProvider(url), (previous, next) {
       final saved = next.value?.state == DownloadState.saved;
@@ -58,7 +62,7 @@ class DownloadBar extends ConsumerWidget {
         scheme.error,
       ),
       AsyncData(value: DownloadProgress(state: DownloadState.saved)) => (
-        l10n.downloadSaved(saveDirFor(preview.platform)),
+        l10n.downloadSaved(saveDirFor(saveFolder, preview.platform)),
         Icons.check_circle_outline_rounded,
         scheme.primary,
       ),

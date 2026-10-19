@@ -2,7 +2,7 @@
   "@@locale": "en",
   "appTitle": "Magpie",
   "@appTitle": {
-    "description": "Placeholder until the app name is decided."
+    "description": "The app's name, shown in the task switcher and the Download header."
   },
   "navDownload": "Download",
   "navLibrary": "Library",
@@ -88,6 +88,20 @@
   "reasonMusicSource": "Suggested for music links",
   "reasonAudioOnly": "This link only has audio",
   "reasonImageOnly": "This link only has images",
+  "reasonWholePost": "Everything in this post",
+  "postPhotos": "{count, plural, =1{1 photo} other{{count} photos}}",
+  "@postPhotos": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "postFiles": "{count, plural, =1{1 file} other{{count} files}}",
+  "@postFiles": {
+    "description": "A post with both photos and videos, saved as this many files.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "showAllOptions": "Show all {count} formats",
   "@showAllOptions": {
     "placeholders": {
@@ -200,45 +214,70 @@
     }
   },
   "libraryDelete": "Delete",
-  "libraryDeleteTitle": "Delete this file?",
   "libraryDeleteBody": "“{title}” will be removed from this device.",
   "@libraryDeleteBody": {
     "placeholders": {
       "title": {"type": "String"}
     }
   },
-  "libraryDeleted": "Deleted",
+  "librarySelected": "{count} selected",
+  "@librarySelected": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "librarySelectAll": "Select all",
+  "libraryEndSelection": "Done selecting",
+  "libraryDeleteManyTitle": "{count, plural, =1{Delete this file?} other{Delete {count} files?}}",
+  "@libraryDeleteManyTitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "libraryDeleteManyBody": "They'll be removed from this device.",
+  "libraryDeletedCount": "{count, plural, =1{Deleted} other{Deleted {count} files}}",
+  "@libraryDeletedCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "cancel": "Cancel",
-  "settingsEngineVersion": "yt-dlp version",
   "settingsDownloads": "Downloads",
   "settingsDefaultQuality": "Default video quality",
   "settingsDefaultQualityHint": "The highest quality picked for new links",
   "settingsPreferAudio": "Prefer audio for music sites",
-  "settingsPreferAudioHint": "Suggest audio for YouTube Music and SoundCloud links",
+  "settingsPreferAudioHint": "Suggest audio for YouTube Music links",
   "settingsSaveLocation": "Save location",
-  "settingsSaveLocationPath": "{root}/<site>",
-  "@settingsSaveLocationPath": {
-    "description": "Where files are saved; <site> stands for the site's folder, e.g. YouTube.",
+  "settingsSaveLocationHint": "{folder} · each site gets its own folder",
+  "@settingsSaveLocationHint": {
     "placeholders": {
-      "root": {"type": "String"}
+      "folder": {"type": "String"}
     }
   },
-  "settingsEngine": "Download engine",
-  "settingsEngineBundled": "Bundled version",
-  "settingsEngineUpdate": "Update",
-  "settingsEngineUpdated": "yt-dlp updated to {version}",
-  "@settingsEngineUpdated": {
+  "saveFolderChanged": "Downloads will be saved in {folder}",
+  "@saveFolderChanged": {
     "placeholders": {
-      "version": {"type": "String"}
+      "folder": {"type": "String"}
     }
   },
-  "settingsEngineUpToDate": "yt-dlp is already up to date",
-  "settingsUpdateChannel": "Update channel",
-  "settingsUpdateChannelHint": "Verified releases, or nightly builds with the newest fixes",
-  "channelStable": "Stable",
-  "channelNightly": "Nightly",
-  "channelStableHint": "Tested releases. Recommended",
-  "channelNightlyHint": "Daily builds. Fixes broken sites sooner, may break others",
+  "saveFolderOutsideDownload": "Choose a folder inside Download on this phone",
+  "settingsAppearance": "Appearance",
+  "settingsTheme": "Theme",
+  "themeSystem": "Same as phone",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "settingsFont": "Font",
+  "fontSystem": "Phone default",
+  "fontSystemHint": "The font your phone uses",
+  "fontSans": "Modern",
+  "fontSansHint": "Clean and simple",
+  "fontSerif": "Classic",
+  "fontSerifHint": "Like the pages of a book",
+  "settingsUpdates": "Updates",
+  "settingsAutoUpdate": "Automatic updates",
+  "settingsAutoUpdateChecking": "Checking for updates…",
+  "settingsAutoUpdateDone": "Up to date. Keeps downloads working as sites change",
+  "settingsAutoUpdateFailed": "Couldn't update. Check your connection",
   "settingsAbout": "About",
   "settingsLicenses": "Open-source licenses",
   "settingsFooter": "{appName} is free and open source. Respect creators and only save what you have the right to.",

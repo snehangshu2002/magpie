@@ -33,6 +33,8 @@ final class MediaPreview {
   final DownloadOptions options;
 }
 
+const _engineUpdateWait = Duration(seconds: 20);
+
 /// Fetches [url] with yt-dlp and works out what to offer.
 @riverpod
 Future<MediaPreview> mediaPreview(
@@ -40,6 +42,13 @@ Future<MediaPreview> mediaPreview(
   Uri url,
   SourcePlatform platform,
 ) async {
+  // A link shared right after launch would otherwise be read by the old
+  // yt-dlp while the new one downloads. Don't wait forever on a slow network.
+  try {
+    await ref.read(engineAutoUpdateProvider.future).timeout(_engineUpdateWait);
+  } on Object {
+    // Slow or failed: the installed yt-dlp still reads most sites.
+  }
   final info = (await ref.watch(mediaRepositoryProvider).fetchInfo(url))
       .getOrThrow();
   final resolved = platform == SourcePlatform.other
@@ -103,7 +112,10 @@ class DownloadStarter extends _$DownloadStarter {
         url: url.toString(),
         formatId: option.formatSelector,
         outputType: option.type,
-        targetDir: saveDirFor(preview.platform),
+        targetDir: saveDirFor(
+          (await ref.read(settingsProvider.future)).saveFolder,
+          preview.platform,
+        ),
         title: preview.info.title,
       ),
       DownloadDetails(

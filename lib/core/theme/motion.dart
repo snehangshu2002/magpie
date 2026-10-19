@@ -4,9 +4,9 @@ import 'package:flutter/widgets.dart';
 /// A spring expressed as a [Curve], so implicit animations (`AnimatedSize`,
 /// `AnimatedSwitcher`, `AnimatedScale`, …) can move like a physical object.
 ///
-/// Use it with `duration: curve.response`. A critically damped spring
-/// (`bounce: 0`) is ~99% settled after one response time; the remaining
-/// fraction is invisible.
+/// Use it with `duration: curve.response`. The raw spring is only ~98.6%
+/// settled after one response time, so the curve is rescaled to land exactly
+/// on 1 there instead of snapping on the last frame.
 class SpringCurve extends Curve {
   new({required this.response, this.bounce = 0})
     : _simulation = SpringSimulation(
@@ -27,10 +27,17 @@ class SpringCurve extends Curve {
 
   final SpringSimulation _simulation;
 
-  @override
-  double transformInternal(double t) => _simulation.x(
-    t * response.inMicroseconds / Duration.microsecondsPerSecond,
+  /// The spring's value after one [response]; divides the curve to reach 1.
+  late final double _end = _simulation.x(
+    response.inMicroseconds / Duration.microsecondsPerSecond,
   );
+
+  @override
+  double transformInternal(double t) =>
+      _simulation.x(
+        t * response.inMicroseconds / Duration.microsecondsPerSecond,
+      ) /
+      _end;
 }
 
 /// App-wide motion values.

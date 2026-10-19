@@ -10,6 +10,7 @@ import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
 import 'package:media_downloader/features/library/domain/library_filter.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
+import 'package:media_downloader/features/library/presentation/library_actions.dart';
 import 'package:media_downloader/features/library/presentation/library_providers.dart';
 import 'package:media_downloader/features/library/presentation/widgets/active_download_tile.dart';
 import 'package:media_downloader/features/library/presentation/widgets/library_tile.dart';
@@ -28,6 +29,10 @@ class LibraryScreen extends ConsumerWidget {
     final filter = ref.watch(libraryFilterStateProvider);
     final list = items.value;
     final shown = list?.where(filter.matches).toList();
+    final selection = ref.watch(librarySelectionProvider);
+    // Ids of files deleted meanwhile drop out here.
+    final selected = [...?shown?.where((item) => selection.contains(item.id))];
+    final selecting = selected.isNotEmpty;
 
     final List<Widget> content;
     if (list == null) {
@@ -86,7 +91,11 @@ class LibraryScreen extends ConsumerWidget {
               for (final (day, group) in _byDay(shown)) ...[
                 SectionLabel(_dayLabel(context, day)),
                 for (final item in group) ...[
-                  LibraryTile(key: ValueKey(item.id), item: item),
+                  LibraryTile(
+                    key: ValueKey(item.id),
+                    item: item,
+                    selecting: selecting,
+                  ),
                   const SizedBox(height: 10),
                 ],
                 const SizedBox(height: 18),
@@ -97,32 +106,41 @@ class LibraryScreen extends ConsumerWidget {
       ];
     }
 
-    return Scaffold(
-      body: CustomScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        slivers: [
-          if (filter.searching)
-            const SliverAppBar(pinned: true, title: _SearchField())
-          else
-            SliverAppBar.large(
-              title: Text(
-                l10n.navLibrary,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+    // Back ends selecting before it leaves the screen.
+    return PopScope(
+      canPop: !selecting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) ref.read(librarySelectionProvider.notifier).clear();
+      },
+      child: Scaffold(
+        body: CustomScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            if (selecting)
+              _SelectionBar(selected: selected, shown: shown!)
+            else if (filter.searching)
+              const SliverAppBar(pinned: true, title: _SearchField())
+            else
+              SliverAppBar.large(
+                title: Text(
+                  l10n.navLibrary,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                actions: [
+                  if (list?.isNotEmpty ?? false)
+                    IconButton(
+                      tooltip: l10n.librarySearch,
+                      icon: const Icon(Icons.search_rounded),
+                      onPressed: ref
+                          .read(libraryFilterStateProvider.notifier)
+                          .openSearch,
+                    ),
+                  const SizedBox(width: 8),
+                ],
               ),
-              actions: [
-                if (list?.isNotEmpty ?? false)
-                  IconButton(
-                    tooltip: l10n.librarySearch,
-                    icon: const Icon(Icons.search_rounded),
-                    onPressed: ref
-                        .read(libraryFilterStateProvider.notifier)
-                        .openSearch,
-                  ),
-                const SizedBox(width: 8),
-              ],
-            ),
-          ...content,
-        ],
+            ...content,
+          ],
+        ),
       ),
     );
   }
@@ -153,6 +171,66 @@ class LibraryScreen extends ConsumerWidget {
     return day.year == now.year
         ? material.formatShortMonthDay(day)
         : material.formatMediumDate(day);
+  }
+}
+
+/// Replaces the title while files are selected: how many, and what can be
+/// done with all of them at once.
+class _SelectionBar extends ConsumerWidget {
+  const new({required this.selected, required this.shown});
+
+  final List<LibraryItem> selected;
+  final List<LibraryItem> shown;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final selection = ref.read(librarySelectionProvider.notifier);
+    return SliverAppBar(
+      pinned: true,
+      leading: IconButton(
+        tooltip: l10n.libraryEndSelection,
+        icon: const Icon(Icons.close_rounded),
+        onPressed: selection.clear,
+      ),
+      title: Text(
+        l10n.librarySelected(selected.length),
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontFeatures: [FontFeature.tabularFigures()],
+        ),
+      ),
+      actions: [
+        if (selected.length < shown.length)
+          IconButton(
+            tooltip: l10n.librarySelectAll,
+            icon: const Icon(Icons.select_all_rounded),
+            onPressed: () {
+              unawaited(HapticFeedback.selectionClick());
+              selection.selectAll([for (final item in shown) item.id]);
+            },
+          ),
+        IconButton(
+          tooltip: l10n.libraryShare,
+          icon: const Icon(Icons.share_outlined),
+          onPressed: () async {
+            if (await shareLibraryItems(context, ref, selected)) {
+              selection.clear();
+            }
+          },
+        ),
+        IconButton(
+          tooltip: l10n.libraryDelete,
+          icon: const Icon(Icons.delete_outline_rounded),
+          onPressed: () async {
+            if (await deleteLibraryItems(context, ref, selected)) {
+              selection.clear();
+            }
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
   }
 }
 

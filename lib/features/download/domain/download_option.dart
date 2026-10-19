@@ -21,8 +21,15 @@ abstract class DownloadOption with _$DownloadOption {
 
     /// Estimated bytes; null when unknown.
     int? sizeBytes,
+
+    /// Files saved: more than one for a whole post.
+    @Default(1) int count,
   }) = _DownloadOption;
 }
+
+/// `startDownload` selector that saves every item of the link: videos in
+/// the best quality, photos as they are.
+const postSelector = 'post';
 
 /// Why [DownloadOptions.recommendedType] was picked; shown next to it.
 enum RecommendationReason {
@@ -31,6 +38,7 @@ enum RecommendationReason {
   musicSource,
   audioOnly,
   imageOnly,
+  wholePost,
 }
 
 /// Everything a link offers, grouped by output type, best first.

@@ -20,8 +20,13 @@ abstract interface class LibraryRepository {
   /// Fires whenever a download saves, fails or is cancelled.
   Stream<void> get downloadsFinished;
 
+  /// Fires when files may have changed outside the app (e.g. deleted in the
+  /// gallery), often several times in a row.
+  Stream<void> get filesChanged;
+
   /// Records downloads that finished while the app wasn't listening, and
-  /// forgets files that were deleted outside the app.
+  /// forgets files that were deleted outside the app. A call made while one
+  /// runs is followed by another run, so no change is missed.
   Future<Result<void>> sync();
 
   /// A preview made from the file at [fileUri]; null if there is none.
@@ -29,8 +34,9 @@ abstract interface class LibraryRepository {
 
   Future<Result<void>> open(LibraryItem item);
 
-  Future<Result<void>> share(LibraryItem item);
+  Future<Result<void>> share(List<LibraryItem> items);
 
-  /// False if the user declined the system's confirmation.
-  Future<Result<bool>> delete(LibraryItem item);
+  /// How many of [items] were deleted; fewer when the user declined the
+  /// system's confirmation.
+  Future<Result<int>> delete(List<LibraryItem> items);
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
+import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Bottom navigation around the top-level branches of the router.
@@ -23,7 +24,17 @@ class AppShell extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: shell,
+      // Peers cross-fade (no slide); the key restarts the fade per tab while
+      // the IndexedStack keeps each tab's state.
+      body: TweenAnimationBuilder<double>(
+        key: ValueKey(shell.currentIndex),
+        tween: Tween(begin: 0, end: 1),
+        duration: AppMotion.durationOf(context),
+        curve: AppMotion.standard,
+        builder: (context, opacity, child) =>
+            Opacity(opacity: opacity, child: child),
+        child: shell,
+      ),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           border: Border(

@@ -12,9 +12,6 @@ extension SourcePlatformBrand on SourcePlatform {
     SourcePlatform.x => SimpleIcons.x,
     SourcePlatform.reddit => SimpleIcons.reddit,
     SourcePlatform.facebook => SimpleIcons.facebook,
-    SourcePlatform.tiktok => SimpleIcons.tiktok,
-    SourcePlatform.vimeo => SimpleIcons.vimeo,
-    SourcePlatform.soundcloud => SimpleIcons.soundcloud,
     SourcePlatform.other => Icons.public,
   };
 
@@ -25,9 +22,6 @@ extension SourcePlatformBrand on SourcePlatform {
     SourcePlatform.x => SimpleIconColors.x,
     SourcePlatform.reddit => SimpleIconColors.reddit,
     SourcePlatform.facebook => SimpleIconColors.facebook,
-    SourcePlatform.tiktok => SimpleIconColors.tiktok,
-    SourcePlatform.vimeo => SimpleIconColors.vimeo,
-    SourcePlatform.soundcloud => SimpleIconColors.soundcloud,
     SourcePlatform.other => null,
   };
 
@@ -69,8 +63,8 @@ class PlatformBadge extends StatelessWidget {
   }
 
   /// Keeps the logo at the 3:1 contrast graphics need. Coloured brands are
-  /// shifted darker or lighter so their hue survives (Vimeo's light blue on
-  /// white); black logos (X, TikTok) on dark surfaces use [fallback].
+  /// shifted darker or lighter so their hue survives (Facebook's blue on
+  /// dark); black logos (X) on dark surfaces use [fallback].
   static Color _legible(
     Color color, {
     required Color on,

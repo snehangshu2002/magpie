@@ -11,12 +11,21 @@ part 'storage_channel.g.dart';
 /// Methods throw [PlatformException] on native errors; repositories wrap
 /// calls in `guardPlatformCall` to turn them into failures.
 class StorageChannel {
-  new({MethodChannel? methods})
-    : _methods = methods ?? const MethodChannel(channelName);
+  new({MethodChannel? methods, EventChannel? changes})
+    : _methods = methods ?? const MethodChannel(channelName),
+      _changes = changes ?? const EventChannel(changesChannelName);
 
   static const channelName = 'app/storage';
+  static const changesChannelName = 'app/storage/changes';
 
   final MethodChannel _methods;
+  final EventChannel _changes;
+
+  /// Fires when shared storage changes: a file added, edited or deleted by
+  /// any app. Comes in bursts; debounce before acting on it.
+  late final Stream<void> changes = _changes.receiveBroadcastStream().map(
+    (_) {},
+  );
 
   /// The files among [uris] that still exist.
   Future<List<StoredFile>> queryFiles(List<String> uris) async {
@@ -35,16 +44,26 @@ class StorageChannel {
   Future<void> openFile(String uri, {String? mimeType}) => _methods
       .invokeMethod<void>('openFile', {'uri': uri, 'mimeType': mimeType});
 
-  Future<void> shareFile(String uri, {String? mimeType, String? title}) =>
-      _methods.invokeMethod<void>('shareFile', {
-        'uri': uri,
-        'mimeType': mimeType,
-        'title': title,
-      });
+  /// Shares the files among [uris] that still exist; `NOT_FOUND` if none do.
+  Future<void> shareFiles(
+    List<String> uris, {
+    String? mimeType,
+    String? title,
+  }) => _methods.invokeMethod<void>('shareFiles', {
+    'uris': uris,
+    'mimeType': mimeType,
+    'title': title,
+  });
 
-  /// False if the system asked the user to confirm and they declined.
-  Future<bool> deleteFile(String uri) async =>
-      await _methods.invokeMethod<bool>('deleteFile', {'uri': uri}) ?? false;
+  /// Deletes [uris]; returns those now gone. Ones the user declined to
+  /// delete in the system prompt are left out.
+  Future<List<String>> deleteFiles(List<String> uris) async =>
+      await _methods.invokeListMethod<String>('deleteFiles', {'uris': uris}) ??
+      const [];
+
+  /// Opens Android's folder picker at Download. The chosen folder's document
+  /// id (`primary:Download/Videos`), or null if the user backed out.
+  Future<String?> pickFolder() => _methods.invokeMethod<String>('pickFolder');
 }
 
 @Riverpod(keepAlive: true)

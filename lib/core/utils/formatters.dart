@@ -11,8 +11,15 @@ String formatByteSize(int bytes, AppLocalizations l10n) {
   String n(double value) =>
       NumberFormat(value < 10 ? '0.#' : '0', l10n.localeName).format(value);
 
-  if (bytes < mega) return l10n.sizeKilobytes(n(bytes / kilo));
-  if (bytes < giga) return l10n.sizeMegabytes(n(bytes / mega));
+  // Rounding can reach 1000 (999.6 KB); show that in the next unit.
+  bool rounds1000(double v) => v >= 999.5;
+
+  if (bytes < mega && !rounds1000(bytes / kilo)) {
+    return l10n.sizeKilobytes(n(bytes / kilo));
+  }
+  if (bytes < giga && !rounds1000(bytes / mega)) {
+    return l10n.sizeMegabytes(n(bytes / mega));
+  }
   return l10n.sizeGigabytes(n(bytes / giga));
 }
 

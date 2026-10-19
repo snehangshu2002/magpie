@@ -10,6 +10,7 @@ import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
 import 'package:media_downloader/features/download/presentation/widgets/media_preview_card.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 extension OutputTypeLabel on OutputType {
@@ -40,7 +41,17 @@ extension RecommendationReasonText on RecommendationReason {
     RecommendationReason.musicSource => l10n.reasonMusicSource,
     RecommendationReason.audioOnly => l10n.reasonAudioOnly,
     RecommendationReason.imageOnly => l10n.reasonImageOnly,
+    RecommendationReason.wholePost => l10n.reasonWholePost,
   };
+}
+
+extension DownloadOptionPostLabel on DownloadOption {
+  /// "19 photos" for an option that saves a whole post; null otherwise.
+  String? postLabel(AppLocalizations l10n) => count == 1
+      ? null
+      : type == OutputType.image
+      ? l10n.postPhotos(count)
+      : l10n.postFiles(count);
 }
 
 /// Preview of the fetched media and the choice of what to save. The common
@@ -63,6 +74,9 @@ class DownloadPanel extends ConsumerWidget {
     final selected =
         ref.watch(selectedDownloadOptionProvider(url)) ?? options.recommended;
     final expanded = ref.watch(optionsExpandedProvider(url));
+    final saveFolder = ref.watch(
+      settingsProvider.select((s) => s.value?.saveFolder ?? defaultSaveFolder),
+    );
 
     void select(DownloadOption option) {
       if (option == selected) return;
@@ -87,8 +101,11 @@ class DownloadPanel extends ConsumerWidget {
         MediaPreviewCard(
           info: preview.info,
           platform: preview.platform,
-          formatCount: [for (final type in options.types) ...options.of(type)]
-              .length,
+          availability:
+              options.recommended.postLabel(l10n) ??
+              l10n.formatsAvailable(
+                [for (final type in options.types) ...options.of(type)].length,
+              ),
         ),
         const SizedBox(height: 28),
         _SectionHeader(
@@ -162,7 +179,7 @@ class DownloadPanel extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: 16),
-        _SaveDestination(path: saveDirFor(preview.platform)),
+        _SaveDestination(path: saveDirFor(saveFolder, preview.platform)),
       ],
     );
   }
@@ -363,6 +380,7 @@ class _OptionTile extends StatelessWidget {
     const tabular = [FontFeature.tabularFigures()];
 
     final title = switch (option.type) {
+      _ when option.count > 1 => option.postLabel(l10n)!,
       OutputType.video when quality != null => l10n.qualityLabel(quality),
       _ => ext ?? option.type.label(l10n),
     };

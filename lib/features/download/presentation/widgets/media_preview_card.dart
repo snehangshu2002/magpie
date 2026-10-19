@@ -16,7 +16,7 @@ class MediaPreviewCard extends StatelessWidget {
   const new({
     required this.info,
     required this.platform,
-    required this.formatCount,
+    required this.availability,
     super.key,
   });
 
@@ -24,7 +24,8 @@ class MediaPreviewCard extends StatelessWidget {
   final SourcePlatform platform;
 
   /// How many options the user can pick from.
-  final int formatCount;
+  /// What can be saved, e.g. "3 formats available" or "19 photos".
+  final String availability;
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +106,7 @@ class MediaPreviewCard extends StatelessWidget {
                       platform.label(l10n),
                       if (thumbnail == null && duration != null)
                         formatDuration(duration),
-                      l10n.formatsAvailable(formatCount),
+                      availability,
                     ].join('  •  '),
                     style: muted,
                   ),

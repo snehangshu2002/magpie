@@ -13,19 +13,24 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final label = theme.textTheme.labelMedium;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
       child: Row(
         children: [
           Expanded(
+            // Screen readers get the original casing, not shouting capitals.
             child: Semantics(
               header: true,
-              child: Text(
-                text.toUpperCase(),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
+              label: text,
+              child: ExcludeSemantics(
+                child: Text(
+                  text.toUpperCase(),
+                  style: label?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: (label.fontSize ?? 12) * 0.067,
+                  ),
                 ),
               ),
             ),
@@ -33,8 +38,9 @@ class SectionLabel extends StatelessWidget {
           if (trailing case final trailing?)
             Text(
               trailing,
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: label?.copyWith(
                 color: scheme.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
         ],
