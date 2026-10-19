@@ -1,4 +1,4 @@
-package com.snehangshu.media_downloader.engine
+package com.snehangshu.magpie.engine
 
 import android.content.Context
 import com.yausername.ffmpeg.FFmpeg

@@ -1,6 +1,6 @@
-package com.snehangshu.media_downloader
+package com.snehangshu.magpie
 
-import com.snehangshu.media_downloader.engine.YtDlpBridge
+import com.snehangshu.magpie.engine.YtDlpBridge
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 

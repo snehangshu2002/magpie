@@ -30,6 +30,6 @@ Future<Result<T>> guardPlatformCall<T>(Future<T> Function() call) async {
   } on PlatformException catch (e) {
     return Err(failureFromPlatformException(e));
   } on MissingPluginException catch (e) {
-    return Err(Failure.engine(detail: e.message));
+    return Err(Failure.unavailable(detail: e.message));
   }
 }

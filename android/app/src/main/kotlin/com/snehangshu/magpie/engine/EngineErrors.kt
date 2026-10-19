@@ -1,4 +1,4 @@
-package com.snehangshu.media_downloader.engine
+package com.snehangshu.magpie.engine
 
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException

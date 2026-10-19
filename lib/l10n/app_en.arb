@@ -1,13 +1,125 @@
 {
   "@@locale": "en",
-  "appTitle": "Media Downloader",
+  "appTitle": "Magpie",
   "@appTitle": {
     "description": "Placeholder until the app name is decided."
   },
   "navDownload": "Download",
   "navLibrary": "Library",
   "navSettings": "Settings",
-  "intakeHint": "Share a link to this app or paste one here to download it.",
+  "intakeHint": "Save videos, music and photos from the apps you use.",
+  "intakeFieldHint": "Paste a link",
+  "intakePaste": "Paste",
+  "intakeClear": "Clear",
+  "intakeFetch": "Get formats",
+  "linkDetected": "{platform} · {kind}",
+  "@linkDetected": {
+    "description": "Status under the link box once the source is recognized, e.g. 'YouTube · Short'.",
+    "placeholders": {
+      "platform": {"type": "String"},
+      "kind": {"type": "String"}
+    }
+  },
+  "linkKindVideo": "Video",
+  "linkKindShort": "Short",
+  "linkKindReel": "Reel",
+  "linkKindPost": "Post",
+  "linkKindStory": "Story",
+  "linkKindTrack": "Track",
+  "linkKindPlaylist": "Playlist",
+  "linkKindUnknown": "Link",
+  "platformOther": "Website",
+  "noticeInvalidLink": "That doesn't look like a link.",
+  "noticeClipboardEmpty": "There's no link on the clipboard.",
+  "noticePlaylistUnsupported": "Playlists aren't supported yet. Open a single video and share that instead.",
+  "supportedTitle": "Works with",
+  "supportedMore": "…and 1,000+ other sites",
+  "shareTip": "Tip: in any app, tap Share and choose {appName}.",
+  "@shareTip": {
+    "placeholders": {
+      "appName": {"type": "String"}
+    }
+  },
+  "preparingEngine": "Preparing the download engine. This takes a few seconds the first time.",
+  "fetchingFormats": "Getting formats…",
+  "saveAs": "Save as",
+  "outputVideo": "Video",
+  "outputAudio": "Audio",
+  "outputImage": "Image",
+  "recommended": "Recommended",
+  "reasonBestUpToCap": "Best quality up to {quality}p",
+  "@reasonBestUpToCap": {
+    "placeholders": {
+      "quality": {"type": "int"}
+    }
+  },
+  "reasonClosestToCap": "Closest to {quality}p",
+  "@reasonClosestToCap": {
+    "placeholders": {
+      "quality": {"type": "int"}
+    }
+  },
+  "reasonMusicSource": "Suggested for music links",
+  "reasonAudioOnly": "This link only has audio",
+  "reasonImageOnly": "This link only has images",
+  "showAllOptions": "Show all {count}",
+  "@showAllOptions": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "showFewerOptions": "Show fewer",
+  "qualityLabel": "{quality}p",
+  "@qualityLabel": {
+    "placeholders": {
+      "quality": {"type": "int"}
+    }
+  },
+  "fpsLabel": "{fps} fps",
+  "@fpsLabel": {
+    "placeholders": {
+      "fps": {"type": "int"}
+    }
+  },
+  "formatCount": "{count, plural, =1{1 format} other{{count} formats}}",
+  "@formatCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "sizeKilobytes": "{size} KB",
+  "@sizeKilobytes": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "sizeMegabytes": "{size} MB",
+  "@sizeMegabytes": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "sizeGigabytes": "{size} GB",
+  "@sizeGigabytes": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "sizeUnknown": "Size unknown",
+  "saveTo": "Saves to {path}",
+  "@saveTo": {
+    "placeholders": {
+      "path": {"type": "String"}
+    }
+  },
+  "download": "Download",
+  "downloadWithSize": "Download · {size}",
+  "@downloadWithSize": {
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "downloadStarted": "Download started",
   "libraryEmpty": "Nothing downloaded yet.",
   "settingsEngineVersion": "yt-dlp version",
   "loading": "Loading…",
@@ -17,5 +129,6 @@
   "failureEngine": "The download engine ran into a problem.",
   "failureStorage": "Couldn't save the file.",
   "failureCancelled": "Cancelled.",
+  "failureUnavailable": "This isn't available in this version yet.",
   "failureUnknown": "Something went wrong."
 }

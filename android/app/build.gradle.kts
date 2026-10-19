@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.snehangshu.media_downloader"
+    namespace = "com.snehangshu.magpie"
     // receive_sharing_intent compiles against API 37.
     compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
@@ -26,7 +26,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.snehangshu.media_downloader"
+        applicationId = "com.snehangshu.magpie"
         // youtubedl-android requires API 24+.
         minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion

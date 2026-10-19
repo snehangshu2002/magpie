@@ -1,8 +1,8 @@
-# Media Downloader
+# Magpie
 
 An open-source Android app that downloads videos, audio and images from sites
 supported by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and saves them to the
-device's shared storage. Name is a placeholder until a final one is chosen.
+device's shared storage.
 
 Built with Flutter; downloads run natively through
 [youtubedl-android](https://github.com/yausername/youtubedl-android).

@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Bottom navigation around the top-level branches of the router.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const new({required this.shell, super.key});
 
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+
+    // A link shared from another app opens the Download tab, where the
+    // intake controller has already picked it up.
+    ref.listen(sharedTextProvider, (_, next) {
+      if (next.hasValue) shell.goBranch(0);
+    });
+
     return Scaffold(
       body: shell,
       bottomNavigationBar: NavigationBar(

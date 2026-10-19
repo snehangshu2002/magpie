@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_downloader/app.dart';
 import 'package:media_downloader/core/errors/failure.dart';
+import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
@@ -21,7 +22,10 @@ void main() {
       tester.pumpWidget(
         ProviderScope(
           retry: (_, _) => null,
-          overrides: [engineRepositoryProvider.overrideWithValue(repository)],
+          overrides: [
+            engineRepositoryProvider.overrideWithValue(repository),
+            sharedTextProvider.overrideWith((ref) => const Stream.empty()),
+          ],
           child: const App(),
         ),
       );

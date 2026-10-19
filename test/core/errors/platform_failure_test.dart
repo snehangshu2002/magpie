@@ -35,10 +35,10 @@ void main() {
     );
   });
 
-  test('treats a missing native handler as an engine failure', () async {
+  test('treats a missing native handler as unavailable', () async {
     expect(
       await failureFor(MissingPluginException('startDownload')),
-      isA<EngineFailure>(),
+      isA<UnavailableFailure>(),
     );
   });
 }
