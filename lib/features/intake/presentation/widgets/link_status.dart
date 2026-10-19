@@ -53,7 +53,7 @@ class LinkStatus extends StatelessWidget {
         true,
       ),
       (_, final DetectedLink link) => (
-        Icons.check_circle_rounded,
+        null,
         l10n.linkDetected(link.platform.label(l10n), link.kind.label(l10n)),
         false,
       ),
@@ -74,16 +74,27 @@ class LinkStatus extends StatelessWidget {
             key: ValueKey(text),
             liveRegion: true,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              padding: const EdgeInsets.fromLTRB(8, 10, 14, 0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    icon,
-                    size: 18,
-                    color: isProblem ? scheme.error : scheme.primary,
+                  SizedBox.square(
+                    dimension: 20,
+                    child: isProblem
+                        ? Icon(icon, size: 18, color: scheme.error)
+                        // A quiet "got it"; the text says what.
+                        : Center(
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       text,

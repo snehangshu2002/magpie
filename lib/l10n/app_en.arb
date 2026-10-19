@@ -34,15 +34,41 @@
   "noticePlaylistUnsupported": "Playlists aren't supported yet. Open a single video and share that instead.",
   "supportedTitle": "Works with",
   "supportedMore": "…and 1,000+ other sites",
-  "shareTip": "Tip: in any app, tap Share and choose {appName}.",
+  "shareTipTitle": "Tip",
+  "shareTip": "In any app, tap {share} and choose {appName} to instantly grab formats.",
   "@shareTip": {
+    "description": "{share} is shareAction and {appName} is appTitle; both are shown in bold.",
     "placeholders": {
+      "share": {"type": "String"},
       "appName": {"type": "String"}
     }
+  },
+  "shareAction": "Share",
+  "@shareAction": {
+    "description": "Name of the system Share button, as other apps show it."
   },
   "preparingEngine": "Preparing the download engine. This takes a few seconds the first time.",
   "fetchingFormats": "Getting formats…",
   "saveAs": "Save as",
+  "outputVideoDetail": "Audio & video",
+  "outputAudioDetail": "Audio only",
+  "outputImageDetail": "Still image",
+  "qualityTitle": "Quality",
+  "formatTitle": "Format",
+  "containerLabel": "{ext} container",
+  "@containerLabel": {
+    "description": "File type of the selected option, e.g. 'MP4 container'.",
+    "placeholders": {
+      "ext": {"type": "String"}
+    }
+  },
+  "previewReady": "Ready",
+  "formatsAvailable": "{count, plural, =1{1 format available} other{{count} formats available}}",
+  "@formatsAvailable": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "outputVideo": "Video",
   "outputAudio": "Audio",
   "outputImage": "Image",
@@ -62,7 +88,7 @@
   "reasonMusicSource": "Suggested for music links",
   "reasonAudioOnly": "This link only has audio",
   "reasonImageOnly": "This link only has images",
-  "showAllOptions": "Show all {count}",
+  "showAllOptions": "Show all {count} formats",
   "@showAllOptions": {
     "placeholders": {
       "count": {"type": "int"}
@@ -106,12 +132,7 @@
     }
   },
   "sizeUnknown": "Size unknown",
-  "saveTo": "Saves to {path}",
-  "@saveTo": {
-    "placeholders": {
-      "path": {"type": "String"}
-    }
-  },
+  "saveDestination": "Save destination",
   "download": "Download",
   "downloadWithSize": "Download · {size}",
   "@downloadWithSize": {
@@ -137,6 +158,47 @@
   "libraryEmpty": "Nothing downloaded yet",
   "libraryEmptyHint": "Videos, music and photos you download show up here.",
   "libraryShare": "Share",
+  "libraryShareHint": "Send to apps or contacts",
+  "libraryOpen": "Open",
+  "libraryOpenHint": "Open in the default app",
+  "libraryCopyLink": "Copy link",
+  "libraryCopyLinkHint": "The original link on {site}",
+  "@libraryCopyLinkHint": {
+    "placeholders": {
+      "site": {"type": "String"}
+    }
+  },
+  "libraryLinkCopied": "Link copied",
+  "libraryDeleteHint": "Remove the file from this device",
+  "libraryMore": "More options",
+  "librarySearch": "Search",
+  "librarySearchHint": "Search downloads",
+  "librarySearchClose": "Close search",
+  "libraryFilterAll": "All",
+  "libraryNoMatches": "Nothing matches",
+  "libraryInProgress": "In progress",
+  "libraryActiveCount": "{count} active",
+  "@libraryActiveCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "libraryToday": "Today",
+  "libraryYesterday": "Yesterday",
+  "libraryProgress": "{done} / {total}",
+  "@libraryProgress": {
+    "description": "Downloaded so far out of the total, e.g. '48 MB / 71 MB'.",
+    "placeholders": {
+      "done": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+  "percentLabel": "{percent}%",
+  "@percentLabel": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
   "libraryDelete": "Delete",
   "libraryDeleteTitle": "Delete this file?",
   "libraryDeleteBody": "“{title}” will be removed from this device.",
@@ -148,6 +210,43 @@
   "libraryDeleted": "Deleted",
   "cancel": "Cancel",
   "settingsEngineVersion": "yt-dlp version",
+  "settingsDownloads": "Downloads",
+  "settingsDefaultQuality": "Default video quality",
+  "settingsDefaultQualityHint": "The highest quality picked for new links",
+  "settingsPreferAudio": "Prefer audio for music sites",
+  "settingsPreferAudioHint": "Suggest audio for YouTube Music and SoundCloud links",
+  "settingsSaveLocation": "Save location",
+  "settingsSaveLocationPath": "{root}/<site>",
+  "@settingsSaveLocationPath": {
+    "description": "Where files are saved; <site> stands for the site's folder, e.g. YouTube.",
+    "placeholders": {
+      "root": {"type": "String"}
+    }
+  },
+  "settingsEngine": "Download engine",
+  "settingsEngineBundled": "Bundled version",
+  "settingsEngineUpdate": "Update",
+  "settingsEngineUpdated": "yt-dlp updated to {version}",
+  "@settingsEngineUpdated": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "settingsEngineUpToDate": "yt-dlp is already up to date",
+  "settingsUpdateChannel": "Update channel",
+  "settingsUpdateChannelHint": "Verified releases, or nightly builds with the newest fixes",
+  "channelStable": "Stable",
+  "channelNightly": "Nightly",
+  "channelStableHint": "Tested releases. Recommended",
+  "channelNightlyHint": "Daily builds. Fixes broken sites sooner, may break others",
+  "settingsAbout": "About",
+  "settingsLicenses": "Open-source licenses",
+  "settingsFooter": "{appName} is free and open source. Respect creators and only save what you have the right to.",
+  "@settingsFooter": {
+    "placeholders": {
+      "appName": {"type": "String"}
+    }
+  },
   "loading": "Loading…",
   "retry": "Retry",
   "failureUnsupportedUrl": "This link isn't supported.",

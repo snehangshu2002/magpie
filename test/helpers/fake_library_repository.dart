@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/utils/result.dart';
+import 'package:media_downloader/features/library/domain/active_download.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/domain/library_repository.dart';
 
@@ -23,6 +24,22 @@ class FakeLibraryRepository implements LibraryRepository {
   Stream<List<LibraryItem>> watchItems() async* {
     yield [..._items];
     yield* _changes.stream;
+  }
+
+  /// Downloads shown as in progress.
+  final active = StreamController<List<ActiveDownload>>.broadcast();
+  final cancelled = <String>[];
+
+  @override
+  Stream<List<ActiveDownload>> watchActive() async* {
+    yield const [];
+    yield* active.stream;
+  }
+
+  @override
+  Future<Result<bool>> cancel(String id) async {
+    cancelled.add(id);
+    return const Ok(true);
   }
 
   @override

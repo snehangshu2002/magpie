@@ -5,7 +5,7 @@ import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 
-/// Default video quality cap until Settings lets the user choose one.
+/// Default video quality cap; Settings can change it.
 const defaultMaxQuality = 1080;
 
 const _imageExts = {'jpg', 'jpeg', 'png', 'webp', 'gif'};
@@ -18,6 +18,7 @@ DownloadOptions? suggestDownloadOptions(
   MediaInfo info, {
   required SourcePlatform platform,
   int maxQuality = defaultMaxQuality,
+  bool preferAudioForMusic = true,
 }) {
   final videos = <_Indexed>[];
   final audios = <_Indexed>[];
@@ -39,7 +40,7 @@ DownloadOptions? suggestDownloadOptions(
   final audio = _audioOptions(audios, videos);
   final image = _imageOptions(images);
 
-  final pick = platform.prefersAudio && audio.isNotEmpty
+  final pick = preferAudioForMusic && platform.prefersAudio && audio.isNotEmpty
       ? (OutputType.audio, RecommendationReason.musicSource)
       : video.isNotEmpty
       ? (OutputType.video, RecommendationReason.bestUpToCap)

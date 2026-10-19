@@ -9,6 +9,7 @@ final class LibraryItem {
     required this.platform,
     required this.type,
     required this.fileUri,
+    required this.sourceUrl,
     required this.savedAt,
     this.mimeType,
     this.ext,
@@ -25,6 +26,9 @@ final class LibraryItem {
 
   /// MediaStore content URI.
   final String fileUri;
+
+  /// The link it was downloaded from.
+  final String sourceUrl;
   final DateTime savedAt;
   final String? mimeType;
   final String? ext;

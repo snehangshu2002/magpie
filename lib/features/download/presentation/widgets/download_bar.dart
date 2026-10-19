@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/errors/failure_message.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
-import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/widgets/pressable_scale.dart';
@@ -178,7 +177,7 @@ class _DownloadButton extends StatelessWidget {
       child: FilledButton.icon(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(56),
-          shape: AppTheme.shape(18),
+          shape: const StadiumBorder(),
           textStyle: theme.textTheme.titleMedium,
         ),
         // Stays enabled while starting so it keeps its colour; the
@@ -228,7 +227,7 @@ class _ProgressButton extends StatelessWidget {
 
     return Material(
       color: scheme.secondaryContainer,
-      shape: AppTheme.shape(18),
+      shape: const StadiumBorder(),
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
         height: 56,

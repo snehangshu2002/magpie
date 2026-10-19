@@ -5,20 +5,29 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/errors/failure_message.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
-import 'package:media_downloader/core/theme/app_theme.dart';
-import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/domain/library_repository.dart';
-import 'package:media_downloader/features/library/presentation/library_providers.dart';
+import 'package:media_downloader/features/library/presentation/widgets/library_thumbnail.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
-enum _Action { share, delete }
+extension on LibraryItem {
+  /// "1080p", or the kind of file when there's no quality.
+  String kind(AppLocalizations l10n) => switch (type) {
+    OutputType.video => switch (quality) {
+      final quality? => l10n.qualityLabel(quality),
+      null => l10n.outputVideo,
+    },
+    OutputType.audio => l10n.outputAudio,
+    OutputType.image => l10n.outputImage,
+  };
+}
 
-/// One saved file: tap to open it; the menu shares or deletes it.
+/// One saved file: tap to open it; More opens a sheet to share, copy the
+/// link or delete it.
 class LibraryTile extends ConsumerWidget {
   const new({required this.item, super.key});
 
@@ -30,92 +39,83 @@ class LibraryTile extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final details = [
-      switch (item.type) {
-        OutputType.video => switch (item.quality) {
-          final quality? => l10n.qualityLabel(quality),
-          null => l10n.outputVideo,
-        },
-        OutputType.audio => l10n.outputAudio,
-        OutputType.image => l10n.outputImage,
-      },
-      if (item.ext case final ext?) ext.toUpperCase(),
+      item.platform.label(l10n),
+      item.kind(l10n),
       if (item.sizeBytes case final size?) formatByteSize(size, l10n),
-      MaterialLocalizations.of(context).formatShortMonthDay(item.savedAt),
     ].join(' · ');
 
-    return InkWell(
-      onTap: () => _run(context, ref, (repository) => repository.open(item)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-        child: Row(
-          children: [
-            _Thumbnail(item: item),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      PlatformBadge(platform: item.platform, size: 18),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          details,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+    return Card(
+      color: scheme.surfaceContainer,
+      child: InkWell(
+        onTap: () => _run(context, ref, (repository) => repository.open(item)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Row(
+            children: [
+              LibraryThumbnail(
+                type: item.type,
+                fileUri: item.fileUri,
+                thumbnailUrl: item.thumbnailUrl,
               ),
-            ),
-            PopupMenuButton<_Action>(
-              onSelected: (action) => switch (action) {
-                _Action.share => _run(
-                  context,
-                  ref,
-                  (repository) => repository.share(item),
-                ),
-                _Action.delete => _delete(context, ref),
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: _Action.share,
-                  child: ListTile(
-                    leading: const Icon(Icons.share_outlined),
-                    title: Text(l10n.libraryShare),
-                  ),
-                ),
-                PopupMenuItem(
-                  value: _Action.delete,
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline, color: scheme.error),
-                    title: Text(
-                      l10n.libraryDelete,
-                      style: TextStyle(color: scheme.error),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      details,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ],
+              ),
+              IconButton(
+                tooltip: l10n.libraryMore,
+                icon: const Icon(Icons.more_vert_rounded),
+                color: scheme.onSurfaceVariant,
+                onPressed: () => _showActions(context, ref),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _showActions(BuildContext context, WidgetRef ref) async {
+    final action = await showModalBottomSheet<_Action>(
+      context: context,
+      builder: (context) => _ActionSheet(item: item),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case _Action.open:
+        await _run(context, ref, (repository) => repository.open(item));
+      case _Action.share:
+        await _run(context, ref, (repository) => repository.share(item));
+      case _Action.copyLink:
+        final messenger = ScaffoldMessenger.of(context);
+        final copied = context.l10n.libraryLinkCopied;
+        await Clipboard.setData(ClipboardData(text: item.sourceUrl));
+        unawaited(HapticFeedback.lightImpact());
+        messenger.showSnackBar(SnackBar(content: Text(copied)));
+      case _Action.delete:
+        await _delete(context, ref);
+    }
   }
 
   /// Runs [call] and reports a failure in a snack bar.
@@ -169,55 +169,188 @@ class LibraryTile extends ConsumerWidget {
   }
 }
 
-/// A 16:9 preview from the file, else yt-dlp's thumbnail, else an icon for
-/// the kind of file.
-class _Thumbnail extends ConsumerWidget {
+enum _Action { open, share, copyLink, delete }
+
+/// The file at the top, then what can be done with it.
+class _ActionSheet extends StatelessWidget {
   const new({required this.item});
 
   final LibraryItem item;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final local = ref.watch(libraryThumbnailProvider(item.fileUri));
-    final placeholder = Center(
-      child: Icon(switch (item.type) {
-        OutputType.video => Icons.movie_outlined,
-        OutputType.audio => Icons.music_note_rounded,
-        OutputType.image => Icons.image_outlined,
-      }, color: scheme.onSurfaceVariant),
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final details = [
+      [item.kind(l10n), ?item.ext?.toUpperCase()].join(' '),
+      if (item.sizeBytes case final size?) formatByteSize(size, l10n),
+      item.platform.label(l10n),
+    ].join(' · ');
+    final divider = Divider(
+      height: 1,
+      indent: 20,
+      endIndent: 20,
+      color: scheme.outlineVariant.withValues(alpha: 0.6),
     );
-    final remote = item.thumbnailUrl;
 
-    return SizedBox(
-      width: 112,
-      height: 63,
-      child: Material(
-        shape: AppTheme.shape(12),
-        clipBehavior: Clip.antiAlias,
-        color: scheme.surfaceContainerHighest,
-        child: AnimatedSwitcher(
-          duration: AppMotion.durationOf(context),
-          child: switch (local) {
-            AsyncData(value: final bytes?) => Image.memory(
-              bytes,
-              key: const ValueKey('local'),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              gaplessPlayback: true,
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 16),
+              child: Row(
+                children: [
+                  LibraryThumbnail(
+                    type: item.type,
+                    fileUri: item.fileUri,
+                    thumbnailUrl: item.thumbnailUrl,
+                    width: 72,
+                    height: 54,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          details,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(context)
+                        .closeButtonTooltip,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
             ),
-            AsyncLoading() => const SizedBox.expand(),
-            _ when remote != null => Image.network(
-              remote,
-              key: const ValueKey('remote'),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              errorBuilder: (_, _, _) => placeholder,
+            divider,
+            const SizedBox(height: 8),
+            _ActionTile(
+              icon: Icons.play_arrow_rounded,
+              title: l10n.libraryOpen,
+              subtitle: l10n.libraryOpenHint,
+              chevron: true,
+              onTap: () => Navigator.pop(context, _Action.open),
             ),
-            _ => placeholder,
-          },
+            _ActionTile(
+              icon: Icons.share_outlined,
+              title: l10n.libraryShare,
+              subtitle: l10n.libraryShareHint,
+              onTap: () => Navigator.pop(context, _Action.share),
+            ),
+            _ActionTile(
+              icon: Icons.link_rounded,
+              title: l10n.libraryCopyLink,
+              subtitle: l10n.libraryCopyLinkHint(item.platform.label(l10n)),
+              onTap: () => Navigator.pop(context, _Action.copyLink),
+            ),
+            const SizedBox(height: 8),
+            divider,
+            const SizedBox(height: 8),
+            _ActionTile(
+              icon: Icons.delete_outline_rounded,
+              title: l10n.libraryDelete,
+              subtitle: l10n.libraryDeleteHint,
+              destructive: true,
+              onTap: () => Navigator.pop(context, _Action.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const new({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.chevron = false,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool chevron;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final color = destructive ? scheme.error : scheme.onSurface;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: destructive
+                    ? scheme.errorContainer
+                    : scheme.secondaryContainer,
+              ),
+              child: Icon(
+                icon,
+                size: 22,
+                color: destructive
+                    ? scheme.onErrorContainer
+                    : scheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(color: color),
+                  ),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: destructive
+                          ? scheme.error
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (chevron)
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+          ],
         ),
       ),
     );

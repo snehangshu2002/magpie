@@ -37,6 +37,12 @@ void main() {
     expect(info.ytDlpVersion, '2026.01.01');
   });
 
+  test('init allows no version before the first update', () async {
+    replyWith({'ytDlpVersion': null});
+
+    expect((await channel.init()).ytDlpVersion, isNull);
+  });
+
   test('fetchInfo parses nested formats from the codec maps', () async {
     replyWith({
       'title': 'Test clip',

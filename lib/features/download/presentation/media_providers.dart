@@ -13,6 +13,7 @@ import 'package:media_downloader/features/download/domain/download_details.dart'
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'media_providers.g.dart';
@@ -44,7 +45,13 @@ Future<MediaPreview> mediaPreview(
   final resolved = platform == SourcePlatform.other
       ? SourcePlatform.fromExtractor(info.extractor)
       : platform;
-  final options = suggestDownloadOptions(info, platform: resolved);
+  final settings = await ref.watch(settingsProvider.future);
+  final options = suggestDownloadOptions(
+    info,
+    platform: resolved,
+    maxQuality: settings.maxQuality,
+    preferAudioForMusic: settings.preferAudioForMusic,
+  );
   if (options == null) throw const Failure.unsupportedUrl();
   return MediaPreview(info: info, platform: resolved, options: options);
 }

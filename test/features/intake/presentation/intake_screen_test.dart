@@ -8,6 +8,7 @@ import 'package:media_downloader/app.dart';
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
+import 'package:media_downloader/core/platform/models/engine_update_result.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
@@ -16,9 +17,11 @@ import 'package:media_downloader/features/download/domain/download_details.dart'
 import 'package:media_downloader/features/download/domain/media_repository.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
+import 'package:media_downloader/features/settings/data/settings_repository_impl.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
 
 import '../../../helpers/fake_library_repository.dart';
+import '../../../helpers/fake_settings_repository.dart';
 
 // Made-up ids and titles only; no real media.
 const _link = 'https://youtu.be/test123';
@@ -108,6 +111,13 @@ class _FakeMediaRepository implements MediaRepository {
 class _FakeEngineRepository implements EngineRepository {
   @override
   Future<Result<String>> initialize() async => const Ok('2026.01.01');
+
+  @override
+  Future<Result<EngineUpdateResult>> update(
+    EngineReleaseChannel channel,
+  ) async => const Ok(
+    EngineUpdateResult(status: EngineUpdateStatus.done, version: '2026.02.02'),
+  );
 }
 
 void main() {
@@ -148,6 +158,9 @@ void main() {
           mediaRepositoryProvider.overrideWithValue(media),
           engineRepositoryProvider.overrideWithValue(_FakeEngineRepository()),
           sharedTextProvider.overrideWith((ref) => shared.stream),
+          settingsRepositoryProvider.overrideWithValue(
+            FakeSettingsRepository(),
+          ),
           libraryRepositoryProvider.overrideWithValue(FakeLibraryRepository()),
         ],
         child: const App(),
@@ -166,7 +179,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    expect(find.text('Works with'), findsOneWidget);
+    expect(find.text('WORKS WITH'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'youtu.be/test123');
     await tester.pumpAndSettle();
@@ -185,9 +198,9 @@ void main() {
     expect(find.text('Test clip'), findsOneWidget);
     expect(find.text('1080p'), findsOneWidget);
     expect(find.text('Recommended'), findsOneWidget);
-    expect(find.text('Best quality up to 1080p'), findsOneWidget);
+    expect(find.textContaining('Best quality up to 1080p'), findsOneWidget);
     expect(find.text('Download · 48 MB'), findsOneWidget);
-    expect(find.text('Saves to Download/Magpie/YouTube'), findsOneWidget);
+    expect(find.text('Download/Magpie/YouTube'), findsOneWidget);
   });
 
   testWidgets('switching to audio updates the download', (tester) async {

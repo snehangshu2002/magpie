@@ -13,10 +13,18 @@ import 'package:media_downloader/l10n/l10n.dart';
 
 /// Thumbnail, title and source of the fetched media.
 class MediaPreviewCard extends StatelessWidget {
-  const new({required this.info, required this.platform, super.key});
+  const new({
+    required this.info,
+    required this.platform,
+    required this.formatCount,
+    super.key,
+  });
 
   final MediaInfo info;
   final SourcePlatform platform;
+
+  /// How many options the user can pick from.
+  final int formatCount;
 
   @override
   Widget build(BuildContext context) {
@@ -25,103 +33,123 @@ class MediaPreviewCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final thumbnail = info.thumbnail;
     final duration = info.duration;
+    final muted = theme.textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
 
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (thumbnail != null)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
+      color: scheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (thumbnail != null)
+              ClipPath(
+                clipper: ShapeBorderClipper(shape: AppTheme.shape(16)),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ColoredBox(color: scheme.surfaceContainerHighest),
+                      Image.network(
+                        thumbnail,
+                        fit: BoxFit.cover,
+                        frameBuilder: (context, child, frame, synchronous) =>
+                            synchronous
+                            ? child
+                            : AnimatedOpacity(
+                                opacity: frame == null ? 0 : 1,
+                                duration: AppMotion.durationOf(context),
+                                child: child,
+                              ),
+                        errorBuilder: (_, _, _) => Center(
+                          child: PlatformBadge(platform: platform, size: 56),
+                        ),
+                      ),
+                      Positioned(
+                        left: 10,
+                        top: 10,
+                        child: _OverlayPill(
+                          icon: Icons.check_circle_outline_rounded,
+                          text: l10n.previewReady,
+                        ),
+                      ),
+                      if (duration != null)
+                        Positioned(
+                          right: 10,
+                          bottom: 10,
+                          child: _OverlayPill(text: formatDuration(duration)),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 14, 4, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ColoredBox(color: scheme.surfaceContainerHighest),
-                  Image.network(
-                    thumbnail,
-                    fit: BoxFit.cover,
-                    frameBuilder: (context, child, frame, synchronous) =>
-                        synchronous
-                        ? child
-                        : AnimatedOpacity(
-                            opacity: frame == null ? 0 : 1,
-                            duration: AppMotion.durationOf(context),
-                            child: child,
-                          ),
-                    errorBuilder: (_, _, _) => Center(
-                      child: PlatformBadge(platform: platform, size: 56),
+                  Text(
+                    info.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (duration != null)
-                    Positioned(
-                      right: 10,
-                      bottom: 10,
-                      child: _DurationPill(formatDuration(duration)),
-                    ),
+                  const SizedBox(height: 6),
+                  Text(
+                    [
+                      platform.label(l10n),
+                      if (thumbnail == null && duration != null)
+                        formatDuration(duration),
+                      l10n.formatsAvailable(formatCount),
+                    ].join('  •  '),
+                    style: muted,
+                  ),
                 ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  info.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    PlatformBadge(platform: platform, size: 22),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        [
-                          platform.label(l10n),
-                          if (thumbnail == null && duration != null)
-                            formatDuration(duration),
-                        ].join(' · '),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _DurationPill extends StatelessWidget {
-  const new(this.text);
+/// Dark, legible-on-any-image label over the thumbnail.
+class _OverlayPill extends StatelessWidget {
+  const new({required this.text, this.icon});
 
   final String text;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: ShapeDecoration(
-      shape: AppTheme.shape(8),
-      color: Colors.black.withValues(alpha: 0.72),
+      shape: const StadiumBorder(),
+      color: Colors.black.withValues(alpha: 0.64),
     ),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
+      padding: EdgeInsets.fromLTRB(icon == null ? 10 : 8, 4, 10, 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon case final icon?) ...[
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -143,39 +171,46 @@ class LoadingPreview extends ConsumerWidget {
     final preparing = ref.watch(engineVersionProvider).isLoading;
 
     return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: ColoredBox(
-              color: scheme.surfaceContainerHighest,
-              child: const Center(
-                child: SizedBox.square(
-                  dimension: 28,
-                  child: CircularProgressIndicator(strokeWidth: 3),
+      color: scheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: DecoratedBox(
+                decoration: ShapeDecoration(
+                  shape: AppTheme.shape(16),
+                  color: scheme.surfaceContainerHighest,
+                ),
+                child: const Center(
+                  child: SizedBox.square(
+                    dimension: 28,
+                    child: CircularProgressIndicator(strokeWidth: 3),
+                  ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                PlatformBadge(platform: platform, size: 22),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    preparing ? l10n.preparingEngine : l10n.fetchingFormats,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 14, 4, 4),
+              child: Row(
+                children: [
+                  PlatformBadge(platform: platform, size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      preparing ? l10n.preparingEngine : l10n.fetchingFormats,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

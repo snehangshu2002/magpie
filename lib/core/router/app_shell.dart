@@ -20,29 +20,42 @@ class AppShell extends ConsumerWidget {
       if (next.hasValue) shell.goBranch(0);
     });
 
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: shell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: shell.currentIndex,
-        onDestinationSelected: (index) =>
-            shell.goBranch(index, initialLocation: index == shell.currentIndex),
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.download_outlined),
-            selectedIcon: const Icon(Icons.download),
-            label: l10n.navDownload,
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.3),
+            ),
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.video_library_outlined),
-            selectedIcon: const Icon(Icons.video_library),
-            label: l10n.navLibrary,
+        ),
+        child: NavigationBar(
+          selectedIndex: shell.currentIndex,
+          onDestinationSelected: (index) => shell.goBranch(
+            index,
+            initialLocation: index == shell.currentIndex,
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon: const Icon(Icons.settings),
-            label: l10n.navSettings,
-          ),
-        ],
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(Icons.download_outlined),
+              selectedIcon: const Icon(Icons.download),
+              label: l10n.navDownload,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.video_library_outlined),
+              selectedIcon: const Icon(Icons.video_library),
+              label: l10n.navLibrary,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.settings_outlined),
+              selectedIcon: const Icon(Icons.settings),
+              label: l10n.navSettings,
+            ),
+          ],
+        ),
       ),
     );
   }

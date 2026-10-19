@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_bar.dart';
@@ -150,21 +151,50 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
             controller: _scroll,
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             slivers: [
-              SliverAppBar.large(title: Text(l10n.navDownload)),
+              const SliverAppBar(
+                pinned: true,
+                titleSpacing: 16,
+                title: _BrandTitle(),
+              ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 24),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 24),
                 sliver: SliverList.list(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        l10n.intakeHint,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                    // The introduction steps aside once there's a link to
+                    // work on, giving the results the room.
+                    AnimatedSize(
+                      duration: duration,
+                      curve: AppMotion.standard,
+                      alignment: Alignment.topCenter,
+                      child: submitted != null
+                          ? const SizedBox(width: double.infinity)
+                          : Padding(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Semantics(
+                                    header: true,
+                                    child: Text(
+                                      l10n.navDownload,
+                                      style: theme.textTheme.headlineMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    l10n.intakeHint,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                     ),
-                    const SizedBox(height: 16),
                     LinkField(
                       controller: _text,
                       focusNode: _focus,
@@ -217,6 +247,36 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// The app's mark and name.
+class _BrandTitle extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        ClipPath(
+          clipper: ShapeBorderClipper(shape: AppTheme.shape(10)),
+          child: Image.asset(
+            'assets/images/logo.png',
+            width: 32,
+            height: 32,
+            excludeFromSemantics: true,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          context.l10n.appTitle,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

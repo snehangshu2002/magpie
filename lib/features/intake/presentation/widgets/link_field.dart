@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:media_downloader/core/media/source_platform.dart';
-import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/pressable_scale.dart';
@@ -50,83 +49,121 @@ class LinkField extends StatelessWidget {
       ),
     );
 
-    return Material(
-      color: theme.colorScheme.surfaceContainerHigh,
-      shape: AppTheme.shape(24),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            AnimatedSwitcher(
-              duration: duration,
-              switchInCurve: AppMotion.standard,
-              switchOutCurve: AppMotion.standard,
-              transitionBuilder: popIn,
-              child: PlatformBadge(
-                key: ValueKey(platform),
-                platform: platform,
-                size: 44,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: onChanged,
-                onSubmitted: (_) => onSubmit(),
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.go,
-                autocorrect: false,
-                enableSuggestions: false,
-                style: theme.textTheme.bodyLarge,
-                decoration: InputDecoration.collapsed(
-                  hintText: l10n.intakeFieldHint,
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            AnimatedSize(
-              duration: duration,
-              curve: AppMotion.standard,
-              child: AnimatedSwitcher(
+    final scheme = theme.colorScheme;
+
+    // A hairline at rest; sage while typing.
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, child) => Material(
+        color: scheme.surfaceContainer,
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: focusNode.hasFocus
+              ? BorderSide(color: scheme.primaryContainer, width: 1.5)
+              : BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+          child: Row(
+            children: [
+              AnimatedSwitcher(
                 duration: duration,
                 switchInCurve: AppMotion.standard,
                 switchOutCurve: AppMotion.standard,
                 transitionBuilder: popIn,
-                child: hasText
-                    ? Row(
-                        key: ValueKey(canSubmit),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: l10n.intakeClear,
-                            icon: const Icon(Icons.close_rounded),
-                            onPressed: onClear,
-                          ),
-                          if (canSubmit)
-                            IconButton.filled(
-                              tooltip: l10n.intakeFetch,
-                              icon: const Icon(Icons.arrow_forward_rounded),
-                              onPressed: onSubmit,
-                            ),
-                        ],
+                child: platform == null
+                    ? Icon(
+                        Icons.link_rounded,
+                        key: const ValueKey(null),
+                        size: 22,
+                        color: scheme.outline,
                       )
-                    : PressableScale(
-                        key: const ValueKey('paste'),
-                        child: FilledButton.tonalIcon(
-                          onPressed: onPaste,
-                          icon: const Icon(
-                            Icons.content_paste_rounded,
-                            size: 18,
-                          ),
-                          label: Text(l10n.intakePaste),
-                        ),
+                    : PlatformBadge(
+                        key: ValueKey(platform),
+                        platform: platform,
+                        size: 32,
                       ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: onChanged,
+                  onSubmitted: (_) => onSubmit(),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.go,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: theme.textTheme.bodyLarge,
+                  decoration: InputDecoration.collapsed(
+                    hintText: l10n.intakeFieldHint,
+                    hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                      color: scheme.outline,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              AnimatedSize(
+                duration: duration,
+                curve: AppMotion.standard,
+                child: AnimatedSwitcher(
+                  duration: duration,
+                  switchInCurve: AppMotion.standard,
+                  switchOutCurve: AppMotion.standard,
+                  transitionBuilder: popIn,
+                  child: hasText
+                      ? Row(
+                          key: ValueKey(canSubmit),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: l10n.intakeClear,
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: onClear,
+                            ),
+                            if (canSubmit)
+                              IconButton.filled(
+                                tooltip: l10n.intakeFetch,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: scheme.primaryContainer,
+                                  foregroundColor: scheme.onPrimaryContainer,
+                                ),
+                                icon: const Icon(Icons.arrow_forward_rounded),
+                                onPressed: onSubmit,
+                              ),
+                          ],
+                        )
+                      : PressableScale(
+                          key: const ValueKey('paste'),
+                          child: FilledButton.icon(
+                            onPressed: onPaste,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: scheme.primaryContainer,
+                              foregroundColor: scheme.onPrimaryContainer,
+                              minimumSize: const Size(0, 40),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              textStyle: theme.textTheme.labelLarge,
+                            ),
+                            icon: const Icon(
+                              Icons.content_paste_rounded,
+                              size: 18,
+                            ),
+                            label: Text(l10n.intakePaste),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter/services.dart';
 import 'package:media_downloader/core/db/app_database.dart';
@@ -10,6 +12,7 @@ import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/stored_file.dart';
 import 'package:media_downloader/core/platform/storage_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
+import 'package:media_downloader/features/library/domain/active_download.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/domain/library_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -40,6 +43,65 @@ class LibraryRepositoryImpl implements LibraryRepository {
       ]);
     return query.watch().map((rows) => rows.map(_toItem).toList());
   }
+
+  @override
+  Stream<List<ActiveDownload>> watchActive() {
+    final query = _db.select(_records)
+      ..where(
+        (r) => r.state.isIn([
+          for (final state in DownloadState.values)
+            if (state.isActive) state.name,
+        ]),
+      )
+      ..orderBy([(r) => OrderingTerm.asc(r.createdAt)]);
+
+    final latest = <String, DownloadProgress>{};
+    var rows = <DownloadRecord>[];
+    StreamSubscription<List<DownloadRecord>>? recordChanges;
+    StreamSubscription<DownloadProgress>? events;
+    late final StreamController<List<ActiveDownload>> controller;
+
+    void emit() => controller.add([
+      for (final r in rows)
+        if (latest[r.id] case final progress? when progress.state.isActive)
+          ActiveDownload(
+            id: r.id,
+            title: r.title ?? r.url,
+            platform:
+                SourcePlatform.values.asNameMap()[r.platform] ??
+                SourcePlatform.other,
+            type:
+                OutputType.values.asNameMap()[r.outputType] ?? OutputType.video,
+            progress: progress,
+            thumbnailUrl: r.thumbnail,
+            sizeBytes: r.sizeBytes,
+          ),
+    ]);
+
+    controller = StreamController(
+      onListen: () {
+        emit();
+        recordChanges = query.watch().listen((value) {
+          rows = value;
+          emit();
+        }, onError: controller.addError);
+        // Progress is best effort: without it nothing shows as running.
+        events = _engine.progress.listen((event) {
+          latest[event.id] = event;
+          emit();
+        }, onError: (_) {});
+      },
+      onCancel: () async {
+        await recordChanges?.cancel();
+        await events?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  @override
+  Future<Result<bool>> cancel(String id) =>
+      guardPlatformCall(() => _engine.cancelDownload(id));
 
   @override
   Stream<void> get downloadsFinished =>
@@ -171,6 +233,7 @@ class LibraryRepositoryImpl implements LibraryRepository {
         SourcePlatform.values.asNameMap()[r.platform] ?? SourcePlatform.other,
     type: OutputType.values.asNameMap()[r.outputType] ?? OutputType.video,
     fileUri: r.fileUri!,
+    sourceUrl: r.url,
     savedAt: r.completedAt ?? r.createdAt,
     mimeType: r.mimeType,
     ext: r.ext,

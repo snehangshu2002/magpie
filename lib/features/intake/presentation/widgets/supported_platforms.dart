@@ -13,77 +13,191 @@ class SupportedPlatforms extends StatelessWidget {
     SourcePlatform.youtube,
     SourcePlatform.instagram,
     SourcePlatform.x,
-    SourcePlatform.reddit,
     SourcePlatform.tiktok,
+    SourcePlatform.reddit,
     SourcePlatform.facebook,
     SourcePlatform.vimeo,
     SourcePlatform.soundcloud,
   ];
+
+  static const _columns = 4;
+  static const _gap = 12.0;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted = TextStyle(color: scheme.onSurfaceVariant);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          l10n.supportedTitle,
-          style: theme.textTheme.titleSmall?.merge(muted),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final platform in _featured)
-              Container(
-                padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
-                decoration: ShapeDecoration(
-                  shape: AppTheme.shape(14),
-                  color: scheme.surfaceContainerLow,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    PlatformBadge(platform: platform, size: 28),
-                    const SizedBox(width: 8),
-                    Text(
-                      platform.label(l10n),
-                      style: theme.textTheme.labelLarge,
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          l10n.supportedMore,
-          style: theme.textTheme.bodySmall?.merge(muted),
-        ),
-        const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(Icons.share_outlined, color: scheme.primary),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    l10n.shareTip(l10n.appTitle),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-              ],
-            ),
+          l10n.supportedTitle.toUpperCase(),
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.6,
           ),
         ),
+        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width =
+                (constraints.maxWidth - _gap * (_columns - 1)) / _columns;
+            return Wrap(
+              spacing: _gap,
+              runSpacing: _gap,
+              children: [
+                for (final platform in _featured)
+                  SizedBox(
+                    width: width,
+                    child: _PlatformTile(platform: platform),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        Text(
+          l10n.supportedMore,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(color: scheme.outline),
+        ),
+        const SizedBox(height: 28),
+        const _ShareTip(),
       ],
     );
+  }
+}
+
+class _PlatformTile extends StatelessWidget {
+  const new({required this.platform});
+
+  final SourcePlatform platform;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        shape: AppTheme.shape(16),
+        color: scheme.surfaceContainerLow,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Column(
+          children: [
+            // The name is right below; the logo needs no label of its own.
+            ExcludeSemantics(child: PlatformBadge(platform: platform)),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                platform.label(context.l10n),
+                maxLines: 1,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// How to send a link here without copying it.
+class _ShareTip extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final body = theme.textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+      height: 1.5,
+    );
+
+    return DecoratedBox(
+      decoration: ShapeDecoration(
+        color: scheme.surfaceContainer,
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.2)),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                color: scheme.secondaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.share_outlined,
+                size: 20,
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.shareTipTitle, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text.rich(
+                    _emphasize(l10n.shareTip(l10n.shareAction, l10n.appTitle), {
+                      l10n.shareAction: TextStyle(color: scheme.onSurface),
+                      l10n.appTitle: TextStyle(color: scheme.primary),
+                    }),
+                    style: body,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Sets the first occurrence of each word in [text] in bold [styles].
+  static TextSpan _emphasize(String text, Map<String, TextStyle> styles) {
+    final marks = [
+      for (final MapEntry(key: word, value: style) in styles.entries)
+        if (text.indexOf(word) case final start when start >= 0)
+          (start, word.length, style),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
+
+    final spans = <TextSpan>[];
+    var at = 0;
+    for (final (start, length, style) in marks) {
+      if (start < at) continue;
+      spans
+        ..add(TextSpan(text: text.substring(at, start)))
+        ..add(
+          TextSpan(
+            text: text.substring(start, start + length),
+            style: style.copyWith(fontWeight: FontWeight.w600),
+          ),
+        );
+      at = start + length;
+    }
+    spans.add(TextSpan(text: text.substring(at)));
+    return TextSpan(children: spans);
   }
 }
