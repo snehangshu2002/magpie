@@ -8,6 +8,7 @@ import android.util.Log
 import com.snehangshu.magpie.ActivityHost
 import com.snehangshu.magpie.storage.StorageException
 import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
@@ -208,7 +209,12 @@ class YtDlpBridge(
             addOption("--ignore-no-formats-error")
             addOption("--no-warnings")
         }
-        val json = JSONObject(YoutubeDL.getInstance().execute(request).out)
+        val out = YoutubeDL.getInstance().execute(request).out
+        // yt-dlp prints `null` when the extractor found no media at all.
+        if (out.isBlank() || out.trim() == "null") {
+            throw YoutubeDLException("Unsupported URL: no media found")
+        }
+        val json = JSONObject(out)
         val entries = json.optJSONArray("entries")?.objects()
         return mapOf(
             "title" to (json.string("title") ?: json.string("fulltitle") ?: json.string("id")),

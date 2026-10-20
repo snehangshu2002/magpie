@@ -211,6 +211,16 @@ void main() {
     expect(options.audio.single.formatSelector, 'http-720');
   });
 
+  test('treats a bare video file as video with sound', () {
+    final options = _suggest(const [
+      MediaFormat(formatId: '0', ext: 'mp4'),
+    ], platform: SourcePlatform.telegram);
+
+    expect(options.recommendedType, OutputType.video);
+    expect(options.video.single.formatSelector, '0');
+    expect(options.video.single.quality, isNull);
+  });
+
   test('switching type picks a sensible default', () {
     final options = _suggest([
       _audio('140'),

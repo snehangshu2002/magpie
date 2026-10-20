@@ -107,4 +107,42 @@ void main() {
     expect(isImageLink(Uri.parse('https://pbs.twimg.com/media/AAA')), isTrue);
     expect(isImageLink(Uri.parse('https://example.com/post/1')), isFalse);
   });
+
+  group('photosFromTelegramEmbed', () {
+    // A trimmed, made-up embed page in Telegram's markup.
+    String embed({String text = 'Test album &amp; more<br/>line two'}) =>
+        '''
+<div class="tgme_widget_message_author accent_color"><a class="tgme_widget_message_owner_name" href="https://t.me/testchannel"><span dir="auto">Test Channel</span></a></div>
+<div class="tgme_widget_message_grouped_wrap">
+<a class="tgme_widget_message_photo_wrap grouped_media_wrap 1 2" href="https://t.me/testchannel/10?single" style="width:800px;background-image:url('https://cdn.example.org/file/aaa.jpg')"></a>
+<a class="tgme_widget_message_photo_wrap grouped_media_wrap 3 4" href="https://t.me/testchannel/11?single" style="width:1280px;background-image:url('https://cdn.example.org/file/bbb.jpg')"></a>
+</div>
+<div class="tgme_widget_message_text js-message_text" dir="auto">$text</div>
+''';
+
+    test('lists every photo of an album, in order', () {
+      final photos = photosFromTelegramEmbed(embed())!;
+
+      expect(photos.photos.map((p) => p.url), [
+        'https://cdn.example.org/file/aaa.jpg',
+        'https://cdn.example.org/file/bbb.jpg',
+      ]);
+      expect(photos.photos.map((p) => p.width), [800, 1280]);
+      expect(photos.photos.first.ext, 'jpg');
+      expect(photos.title, 'Test album & more line two');
+    });
+
+    test("uses the channel's name when the post has no text", () {
+      expect(photosFromTelegramEmbed(embed(text: ''))!.title, 'Test Channel');
+    });
+
+    test('returns null for a post without photos', () {
+      expect(
+        photosFromTelegramEmbed(
+          '<a class="tgme_widget_message_video_player" href="#"></a>',
+        ),
+        isNull,
+      );
+    });
+  });
 }
