@@ -1,5 +1,5 @@
 /// A photo the engine saves by plain download, at the site's full size:
-/// photos yt-dlp leaves out (X, Reddit) or a link that is an image itself.
+/// photos yt-dlp leaves out (X) or a link that is an image itself.
 final class WebPhoto {
   const new({
     required this.url,

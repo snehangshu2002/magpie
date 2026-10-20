@@ -37,7 +37,7 @@ final class MediaPreview {
 const _engineUpdateWait = Duration(seconds: 20);
 
 /// Fetches [url] with yt-dlp and works out what to offer. Full-size photos
-/// yt-dlp leaves out (X, Reddit, a link to an image) are looked up alongside.
+/// yt-dlp leaves out (X, a link to an image) are looked up alongside.
 @riverpod
 Future<MediaPreview> mediaPreview(
   Ref ref,
