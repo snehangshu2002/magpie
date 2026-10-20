@@ -9,3 +9,8 @@ part 'update_providers.g.dart';
 @Riverpod(keepAlive: true)
 Future<AppUpdate?> appUpdate(Ref ref) async =>
     (await ref.watch(updateRepositoryProvider).check()).getOrThrow();
+
+/// The installed app's version, shown in Settings.
+@Riverpod(keepAlive: true)
+Future<String> appVersion(Ref ref) async =>
+    (await ref.watch(updateRepositoryProvider).installedVersion()).getOrThrow();

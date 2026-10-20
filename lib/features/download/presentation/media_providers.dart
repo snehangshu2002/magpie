@@ -13,6 +13,7 @@ import 'package:media_downloader/features/download/domain/download_details.dart'
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
+import 'package:media_downloader/features/download/domain/web_photo.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -35,24 +36,47 @@ final class MediaPreview {
 
 const _engineUpdateWait = Duration(seconds: 20);
 
-/// Fetches [url] with yt-dlp and works out what to offer.
+/// Fetches [url] with yt-dlp and works out what to offer. Full-size photos
+/// yt-dlp leaves out (X, Reddit, a link to an image) are looked up alongside.
 @riverpod
 Future<MediaPreview> mediaPreview(
   Ref ref,
   Uri url,
   SourcePlatform platform,
 ) async {
-  // A link shared right after launch would otherwise be read by the old
-  // yt-dlp while the new one downloads. Don't wait forever on a slow network.
-  try {
-    await ref.read(engineAutoUpdateProvider.future).timeout(_engineUpdateWait);
-  } on Object {
-    // Slow or failed: the installed yt-dlp still reads most sites.
+  final repository = ref.watch(mediaRepositoryProvider);
+  final photosCall = repository.fetchPhotos(url, platform);
+  // yt-dlp can't read a link to an image file; don't wait for it to say so.
+  final info = isImageLink(url) ? null : await _fetchInfo(ref, url);
+  // A failed photo lookup leaves yt-dlp's result as it is.
+  var photos = switch (await photosCall) {
+    Ok(:final value) => value,
+    Err() => null,
+  };
+  if (photos == null &&
+      info is Err<MediaInfo> &&
+      info.failure is UnsupportedUrlFailure) {
+    photos = switch (await repository.fetchImage(url)) {
+      Ok(:final value) => value,
+      Err() => null,
+    };
   }
-  final info = (await ref.watch(mediaRepositoryProvider).fetchInfo(url))
-      .getOrThrow();
+  final MediaInfo media;
+  if (info is Ok<MediaInfo>) {
+    media = info.value.thumbnail == null && photos != null
+        ? info.value.copyWith(thumbnail: photos.photos.first.previewUrl)
+        : info.value;
+  } else if (photos != null) {
+    media = MediaInfo(
+      title: photos.title ?? url.host,
+      extractor: '',
+      thumbnail: photos.photos.first.previewUrl,
+    );
+  } else {
+    throw (info as Err<MediaInfo>?)?.failure ?? const Failure.unsupportedUrl();
+  }
   final resolved = platform == SourcePlatform.other
-      ? SourcePlatform.fromExtractor(info.extractor)
+      ? SourcePlatform.fromExtractor(media.extractor)
       : platform;
   // Only these two shape the options; theme, font or folder changes must not
   // re-fetch the link.
@@ -60,13 +84,25 @@ Future<MediaPreview> mediaPreview(
     settingsProvider.selectAsync((s) => (s.maxQuality, s.preferAudioForMusic)),
   );
   final options = suggestDownloadOptions(
-    info,
+    media,
     platform: resolved,
+    photos: photos?.photos ?? const [],
     maxQuality: maxQuality,
     preferAudioForMusic: preferAudioForMusic,
   );
   if (options == null) throw const Failure.unsupportedUrl();
-  return MediaPreview(info: info, platform: resolved, options: options);
+  return MediaPreview(info: media, platform: resolved, options: options);
+}
+
+Future<Result<MediaInfo>> _fetchInfo(Ref ref, Uri url) async {
+  // A link shared right after launch would otherwise be read by the old
+  // yt-dlp while the new one downloads. Don't wait forever on a slow network.
+  try {
+    await ref.read(engineAutoUpdateProvider.future).timeout(_engineUpdateWait);
+  } on Object {
+    // Slow or failed: the installed yt-dlp still reads most sites.
+  }
+  return await ref.read(mediaRepositoryProvider).fetchInfo(url);
 }
 
 /// The option the user picked for [url]; null means the recommended one.
@@ -135,6 +171,7 @@ class DownloadStarter extends _$DownloadStarter {
         ),
         title: preview.info.title,
         items: option.items,
+        imageUrls: option.imageUrls,
       ),
       DownloadDetails(
         platform: preview.platform,

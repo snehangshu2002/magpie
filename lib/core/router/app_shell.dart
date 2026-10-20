@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
@@ -35,17 +36,7 @@ class AppShell extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      // Peers cross-fade (no slide); the key restarts the fade per tab while
-      // the IndexedStack keeps each tab's state.
-      body: TweenAnimationBuilder<double>(
-        key: ValueKey(shell.currentIndex),
-        tween: Tween(begin: 0, end: 1),
-        duration: AppMotion.durationOf(context),
-        curve: AppMotion.standard,
-        builder: (context, opacity, child) =>
-            Opacity(opacity: opacity, child: child),
-        child: shell,
-      ),
+      body: shell,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           border: Border(
@@ -81,4 +72,63 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// The branches side by side: a left or right swipe moves to the next
+/// section with the page under the finger. A tap on the navigation bar jumps
+/// and cross-fades instead, since it can skip a section.
+class BranchPager extends StatefulWidget {
+  const new({required this.shell, required this.children, super.key});
+
+  final StatefulNavigationShell shell;
+  final List<Widget> children;
+
+  @override
+  State<BranchPager> createState() => _BranchPagerState();
+}
+
+class _BranchPagerState extends State<BranchPager>
+    with SingleTickerProviderStateMixin {
+  late final _pages = PageController(initialPage: widget.shell.currentIndex);
+  late final _fade = AnimationController(vsync: this, value: 1);
+
+  @override
+  void didUpdateWidget(BranchPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final index = widget.shell.currentIndex;
+    // A swipe already shows the page; anything else (a tap, a shared link)
+    // fades it in. The jump waits for the frame, hidden by the fade.
+    if (!_pages.hasClients || _pages.page?.round() == index) return;
+    _fade
+      ..duration = AppMotion.durationOf(context)
+      ..value = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_pages.hasClients) return;
+      _pages.jumpToPage(widget.shell.currentIndex);
+      _fade.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: CurvedAnimation(parent: _fade, curve: AppMotion.standard),
+    child: PageView(
+      controller: _pages,
+      onPageChanged: (index) {
+        if (index == widget.shell.currentIndex) return;
+        // The keyboard belongs to the page being left.
+        FocusManager.instance.primaryFocus?.unfocus();
+        unawaited(HapticFeedback.selectionClick());
+        widget.shell.goBranch(index);
+      },
+      children: widget.children,
+    ),
+  );
 }

@@ -75,6 +75,13 @@ class UpdateRepositoryImpl implements UpdateRepository {
   }
 
   @override
+  Future<Result<String>> installedVersion() async =>
+      switch (await guardPlatformCall(_channel.appInfo)) {
+        Ok(:final value) => Ok(value.version),
+        Err(:final failure) => Err(failure),
+      };
+
+  @override
   Future<Result<void>> open(String url) =>
       guardPlatformCall(() => _channel.openUrl(url));
 }

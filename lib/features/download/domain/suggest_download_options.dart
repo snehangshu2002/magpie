@@ -4,9 +4,14 @@ import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
+import 'package:media_downloader/features/download/domain/web_photo.dart';
 
 /// Default video quality cap; Settings can change it.
 const defaultMaxQuality = 1080;
+
+/// "Best available" in Settings: a cap no video reaches, so the source's
+/// highest quality is picked.
+const int bestAvailableQuality = 1 << 20;
 
 const _imageExts = {'jpg', 'jpeg', 'png', 'webp', 'gif'};
 const _audioExts = {'m4a', 'mp3', 'opus', 'ogg', 'oga', 'aac', 'flac', 'wav'};
@@ -14,13 +19,79 @@ const _audioExts = {'m4a', 'mp3', 'opus', 'ogg', 'oga', 'aac', 'flac', 'wav'};
 /// Turns yt-dlp's raw format list into the few choices people care about
 /// (one per video quality, one per audio container, images) and picks the
 /// one that fits the link best. A post with several items, or a photo post,
-/// gets a single option that saves all of it. Returns null when nothing is
-/// downloadable.
+/// gets a single option that saves all of it. [photos] are full-size photos
+/// found outside yt-dlp (X, Reddit, a link to an image): saved on their own
+/// when yt-dlp found nothing else, else offered as the image choice next to
+/// its video. Returns null when nothing is downloadable.
 DownloadOptions? suggestDownloadOptions(
   MediaInfo info, {
   required SourcePlatform platform,
+  List<WebPhoto> photos = const [],
   int maxQuality = defaultMaxQuality,
   bool preferAudioForMusic = true,
+}) {
+  final options = _engineOptions(
+    info,
+    platform: platform,
+    maxQuality: maxQuality,
+    preferAudioForMusic: preferAudioForMusic,
+  );
+  if (photos.isEmpty) return options;
+  final photoOption = _photosOption(photos);
+  if (options == null || (options.video.isEmpty && options.audio.isEmpty)) {
+    return DownloadOptions(
+      video: const [],
+      audio: const [],
+      image: [photoOption],
+      recommendedType: OutputType.image,
+      reason: photos.length > 1
+          ? RecommendationReason.wholePost
+          : RecommendationReason.imageOnly,
+      maxQuality: maxQuality,
+      postItems: photos.length > 1
+          ? [
+              for (final (i, photo) in photos.indexed)
+                (
+                  index: i + 1,
+                  type: OutputType.image,
+                  thumbnail: photo.previewUrl,
+                  duration: null,
+                ),
+            ]
+          : const [],
+    );
+  }
+  // A post whose items are picked one by one has no type choice to put the
+  // photos in; it keeps what yt-dlp found.
+  if (options.postItems.isNotEmpty) return options;
+  return options.copyWith(image: [photoOption, ...options.image]);
+}
+
+/// One option that saves all of [photos], at full size.
+DownloadOption _photosOption(List<WebPhoto> photos) {
+  final single = photos.length == 1 ? photos.single : null;
+  final sizes = [for (final p in photos) p.sizeBytes];
+  return DownloadOption(
+    type: OutputType.image,
+    formatSelector: photosSelector,
+    ext: single?.ext,
+    quality: switch ((single?.width, single?.height)) {
+      (final int w, final int h) => math.min(w, h),
+      _ => null,
+    },
+    sizeBytes: sizes.contains(null)
+        ? null
+        : sizes.fold<int>(0, (sum, size) => sum + size!),
+    count: photos.length,
+    imageUrls: [for (final p in photos) p.url],
+  );
+}
+
+DownloadOptions? _engineOptions(
+  MediaInfo info, {
+  required SourcePlatform platform,
+  required int maxQuality,
+  required bool preferAudioForMusic,
 }) {
   final entries =
       info.entries ??

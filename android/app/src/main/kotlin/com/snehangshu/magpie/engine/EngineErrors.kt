@@ -46,8 +46,13 @@ internal object EngineErrors {
         is StorageException -> Error(STORAGE, e.message)
         is FitTooLargeException -> Error(TOO_LARGE, e.message)
         is EncodeException -> Error(ENCODE, e.message)
+        is ImageFetcher.CancelledException -> Error(CANCELLED, e.message)
+        is NotAnImageException -> Error(UNSUPPORTED_URL, e.message)
+        is HttpStatusException -> Error(NETWORK, e.message)
         is FileNotFoundException -> Error(NOT_FOUND, e.message)
         is NoAppException -> Error(NO_APP, e.message)
+        // Plain HTTP image downloads (`images` jobs).
+        is SocketException, is UnknownHostException, is SocketTimeoutException -> Error(NETWORK, e.message)
         else -> Error(UNKNOWN, e.message)
     }
 

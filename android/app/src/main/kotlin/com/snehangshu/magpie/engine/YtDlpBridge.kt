@@ -82,6 +82,7 @@ class YtDlpBridge(
                     targetDir = call.requireString("targetDir"),
                     title = call.argument<String>("title"),
                     items = call.argument<List<Int>>("items"),
+                    imageUrls = call.argument<List<String>>("imageUrls"),
                 )
                 requestDownloadPermissions()
                 withContext(Dispatchers.Main) { DownloadService.start(context, request) }

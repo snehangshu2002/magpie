@@ -1,12 +1,23 @@
+import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/domain/download_details.dart';
+import 'package:media_downloader/features/download/domain/web_photo.dart';
 
 /// Looks up media behind a link and hands downloads to the engine.
 abstract interface class MediaRepository {
   Future<Result<MediaInfo>> fetchInfo(Uri url);
+
+  /// Full-size photos of [url] that yt-dlp leaves out: those of a post on X
+  /// or Reddit, or the image itself when the link is one. Null when there
+  /// are none.
+  Future<Result<WebPhotos?>> fetchPhotos(Uri url, SourcePlatform platform);
+
+  /// The image at [url] in full size, when the link serves one; for links
+  /// yt-dlp can't read.
+  Future<Result<WebPhotos?>> fetchImage(Uri url);
 
   /// Queues a download and adds it to the history; returns its id.
   Future<Result<String>> startDownload(

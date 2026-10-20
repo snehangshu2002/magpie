@@ -16,6 +16,7 @@ import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -37,8 +38,13 @@ data class DownloadRequest(
     val outputType: String,
     val targetDir: String,
     val title: String?,
-    /** 1-based items of a `post` to save, in order; null saves every item. */
+    /**
+     * 1-based items of a `post` to save, in order; null saves every item.
+     * For `images`, the place in the post of each of [imageUrls].
+     */
     val items: List<Int>? = null,
+    /** Full-size photos an `images` job downloads, in order. */
+    val imageUrls: List<String>? = null,
     /**
      * Set for a `fitVideo` job: [url] is then the content URI of a saved
      * video to re-encode, not a link.
@@ -168,6 +174,7 @@ class DownloadService : Service() {
             val files = when {
                 fit != null -> listOf(fitVideo(task, fit, workDir))
                 task.request.formatId == FORMAT_POST -> downloadPost(task, workDir)
+                task.request.formatId == FORMAT_IMAGES -> downloadImages(task, workDir)
                 else -> listOf(downloadFormat(task, workDir))
             }
             task.state = STATE_MERGING
@@ -293,6 +300,38 @@ class DownloadService : Service() {
     }
 
     /**
+     * Saves the photos at [DownloadRequest.imageUrls] ([FORMAT_IMAGES]) as
+     * the site serves them, named like a post's items. Returns the files in
+     * order.
+     */
+    private fun downloadImages(task: DownloadTask, workDir: File): List<File> {
+        val urls = task.request.imageUrls.orEmpty()
+        require(urls.isNotEmpty()) { "No image URLs" }
+        val title = task.request.title?.let(::safeFileName)?.takeIf { it.isNotBlank() } ?: "image"
+        val places = task.request.items?.takeIf { it.size == urls.size }
+        val started = SystemClock.elapsedRealtime()
+        var done = 0L
+        return urls.mapIndexed { i, url ->
+            val file = File(workDir, "$i.download")
+            ImageFetcher.fetch(url, file, isCancelled = { task.cancelRequested }) { read, total ->
+                val part = if (total != null) read.toFloat() / total else 0f
+                task.percent = ((i + part.coerceIn(0f, 1f)) / urls.size * 100f).coerceIn(0f, 100f)
+                val seconds = (SystemClock.elapsedRealtime() - started) / 1000f
+                if (seconds > 0.5f) task.speed = formatSpeed((done + read) / seconds)
+                publish(task)
+            }
+            done += file.length()
+            val ext = MediaStoreSaver.imageExtensionOf(file)
+                ?: url.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "")
+                    .lowercase().takeIf { it in IMAGE_EXTENSIONS }
+                ?: "jpg"
+            val number = places?.get(i) ?: (i + 1).takeIf { urls.size > 1 }
+            val name = if (number != null) "$title $number.$ext" else "$title.$ext"
+            File(workDir, name).also { file.renameTo(it) }
+        }
+    }
+
+    /**
      * Re-encodes the saved video at [DownloadRequest.url] (a content URI) to
      * fit [spec]; returns `<name>.mp4`. FFmpeg can't read content URIs, so
      * the video is copied into [workDir] first.
@@ -368,6 +407,7 @@ class DownloadService : Service() {
         targetDir = getStringExtra(EXTRA_TARGET_DIR) ?: return null,
         title = getStringExtra(EXTRA_TITLE),
         items = getIntArrayExtra(EXTRA_ITEMS)?.toList()?.takeIf { it.isNotEmpty() },
+        imageUrls = getStringArrayListExtra(EXTRA_IMAGE_URLS)?.takeIf { it.isNotEmpty() },
         fit = getStringExtra(EXTRA_FIT_NAME)?.let { name ->
             FitSpec(
                 targetBytes = getLongExtra(EXTRA_FIT_TARGET_BYTES, 0),
@@ -398,6 +438,7 @@ class DownloadService : Service() {
         private const val EXTRA_TARGET_DIR = "targetDir"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_ITEMS = "items"
+        private const val EXTRA_IMAGE_URLS = "imageUrls"
         private const val EXTRA_FIT_TARGET_BYTES = "fitTargetBytes"
         private const val EXTRA_FIT_DURATION_MS = "fitDurationMs"
         private const val EXTRA_FIT_VIDEO_KBPS = "fitVideoKbps"
@@ -411,6 +452,10 @@ class DownloadService : Service() {
 
         /** `startDownload` selector for every item of the link (see CLAUDE.md). */
         private const val FORMAT_POST = "post"
+
+        /** `startDownload` selector for photos Dart found (see CLAUDE.md). */
+        private const val FORMAT_IMAGES = "images"
+        private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "avif")
         private const val NO_FORMATS = "No video formats found"
 
         // "[download] Downloading item 3 of 19"
@@ -421,6 +466,12 @@ class DownloadService : Service() {
 
         // "[download]  45.3% of ~ 10.00MiB at    2.31MiB/s ETA 00:03"
         private val SPEED = Regex("""\bat\s+(\S+/s)""")
+
+        /** [bytesPerSecond] the way yt-dlp writes it, e.g. `2.31MiB/s`. */
+        private fun formatSpeed(bytesPerSecond: Float): String = when {
+            bytesPerSecond >= 1024 * 1024 -> "%.2fMiB/s".format(Locale.ROOT, bytesPerSecond / (1024 * 1024))
+            else -> "%.2fKiB/s".format(Locale.ROOT, bytesPerSecond / 1024)
+        }
 
         /** Ids queued or running in this process. */
         private val activeIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
@@ -436,6 +487,7 @@ class DownloadService : Service() {
                 .putExtra(EXTRA_TARGET_DIR, request.targetDir)
                 .putExtra(EXTRA_TITLE, request.title)
                 .putExtra(EXTRA_ITEMS, request.items?.toIntArray())
+                .putStringArrayListExtra(EXTRA_IMAGE_URLS, request.imageUrls?.let(::ArrayList))
             request.fit?.let { fit ->
                 intent.putExtra(EXTRA_FIT_TARGET_BYTES, fit.targetBytes)
                     .putExtra(EXTRA_FIT_DURATION_MS, fit.durationMs)

@@ -9,11 +9,14 @@ import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/page_header.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
+import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
 import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
 import 'package:media_downloader/features/updater/domain/app_update.dart';
+import 'package:media_downloader/features/updater/presentation/update_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
+import 'package:simple_icons/simple_icons.dart';
 
 extension AppearanceModeLabel on AppearanceMode {
   String label(AppLocalizations l10n) => switch (this) {
@@ -57,6 +60,15 @@ class SettingsScreen extends ConsumerWidget {
             pinned: true,
             titleSpacing: side,
             title: const BrandTitle(),
+            actions: [
+              IconButton(
+                tooltip: l10n.settingsSourceCode,
+                icon: const Icon(SimpleIcons.github, size: 22),
+                onPressed: () =>
+                    _openUrl(context, ref, 'https://github.com/$projectRepo'),
+              ),
+              SizedBox(width: side - 8),
+            ],
           ),
           SliverPadding(
             padding: EdgeInsets.fromLTRB(side, 12, side, 32),
@@ -117,14 +129,17 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingTile(
                       title: l10n.settingsDefaultQuality,
                       subtitle: l10n.settingsDefaultQualityHint,
-                      value: l10n.qualityLabel(settings.maxQuality),
+                      value: _maxQualityLabel(l10n, settings.maxQuality),
                       onTap: () async {
                         final quality = await _choose(
                           context,
                           title: l10n.settingsDefaultQuality,
                           values: AppSettings.qualities,
                           selected: settings.maxQuality,
-                          label: l10n.qualityLabel,
+                          label: (q) => _maxQualityLabel(l10n, q),
+                          hint: (q) => q == bestAvailableQuality
+                              ? l10n.qualityBestHint
+                              : null,
                         );
                         if (quality != null) {
                           await controller.change(
@@ -164,11 +179,16 @@ class SettingsScreen extends ConsumerWidget {
                 SectionLabel(l10n.settingsAbout),
                 _Group(
                   children: [
+                    const _VersionTile(),
                     _SettingTile(
-                      icon: Icons.code_rounded,
-                      title: l10n.settingsSourceCode,
-                      subtitle: 'github.com/$projectRepo',
-                      onTap: () => _openSourceCode(context, ref),
+                      icon: SimpleIcons.github,
+                      title: l10n.settingsDeveloper,
+                      subtitle: 'github.com/$projectOwner',
+                      onTap: () => _openUrl(
+                        context,
+                        ref,
+                        'https://github.com/$projectOwner',
+                      ),
                     ),
                     _SettingTile(
                       icon: Icons.description_outlined,
@@ -176,6 +196,7 @@ class SettingsScreen extends ConsumerWidget {
                       onTap: () => showLicensePage(
                         context: context,
                         applicationName: l10n.appTitle,
+                        applicationVersion: ref.read(appVersionProvider).value,
                         applicationIcon: Padding(
                           padding: const EdgeInsets.all(12),
                           child: ClipPath(
@@ -260,15 +281,15 @@ class SettingsScreen extends ConsumerWidget {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  static Future<void> _openSourceCode(
+  /// Opens [url] in the browser, or says why it couldn't.
+  static Future<void> _openUrl(
     BuildContext context,
     WidgetRef ref,
+    String url,
   ) async {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
-    final opened = await ref
-        .read(updateRepositoryProvider)
-        .open('https://github.com/$projectRepo');
+    final opened = await ref.read(updateRepositoryProvider).open(url);
     if (opened case Err(:final failure)) {
       messenger.showSnackBar(SnackBar(content: Text(failure.message(l10n))));
     }
@@ -286,7 +307,7 @@ class SettingsScreen extends ConsumerWidget {
     required List<T> values,
     required T selected,
     required String Function(T) label,
-    String Function(T)? hint,
+    String? Function(T)? hint,
     TextStyle? Function(T)? style,
   }) => showModalBottomSheet<T>(
     context: context,
@@ -309,9 +330,10 @@ class SettingsScreen extends ConsumerWidget {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   selected: value == selected,
                   title: Text(label(value), style: style?.call(value)),
-                  subtitle: hint == null
-                      ? null
-                      : Text(hint(value), style: style?.call(value)),
+                  subtitle: switch (hint?.call(value)) {
+                    final hint? => Text(hint, style: style?.call(value)),
+                    null => null,
+                  },
                   trailing: value == selected
                       ? Icon(Icons.check_rounded, color: scheme.primary)
                       : null,
@@ -369,6 +391,27 @@ class _AutoUpdateTile extends ConsumerWidget {
         ),
         _ => Icon(Icons.check_circle_rounded, color: scheme.primary),
       },
+    );
+  }
+}
+
+/// The installed version; blank until the platform answers.
+class _VersionTile extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return _SettingTile(
+      icon: Icons.info_outline_rounded,
+      title: context.l10n.settingsVersion,
+      trailing: Text(
+        ref.watch(appVersionProvider).value ?? '',
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
     );
   }
 }
@@ -489,3 +532,9 @@ class _SettingTile extends StatelessWidget {
     );
   }
 }
+
+/// "1080p", or "Best available" for no cap.
+String _maxQualityLabel(AppLocalizations l10n, int quality) =>
+    quality == bestAvailableQuality
+    ? l10n.qualityBest
+    : l10n.qualityLabel(quality);

@@ -20,8 +20,10 @@ GoRouter appRouter(Ref ref) {
     // An unknown location (e.g. a stray deep link) lands on the Download tab.
     onException: (context, state, router) => router.go(AppRoutes.intake),
     routes: [
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (context, state, shell) => AppShell(shell: shell),
+        navigatorContainerBuilder: (context, shell, children) =>
+            BranchPager(shell: shell, children: children),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -31,7 +33,9 @@ GoRouter appRouter(Ref ref) {
               ),
             ],
           ),
+          // Preloaded, so a swipe reveals the page instead of a blank one.
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: AppRoutes.library,
@@ -40,6 +44,7 @@ GoRouter appRouter(Ref ref) {
             ],
           ),
           StatefulShellBranch(
+            preload: true,
             routes: [
               GoRoute(
                 path: AppRoutes.settings,

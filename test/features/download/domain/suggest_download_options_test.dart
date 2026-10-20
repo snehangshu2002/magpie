@@ -4,6 +4,7 @@ import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
+import 'package:media_downloader/features/download/domain/web_photo.dart';
 
 MediaFormat _video(
   String id,
@@ -336,6 +337,114 @@ void main() {
 
     test('nothing to save without formats or a photo', () {
       expect(suggestPost(null, thumbnail: null), isNull);
+    });
+  });
+
+  test('"Best available" picks the highest quality', () {
+    final options = suggestDownloadOptions(
+      MediaInfo(
+        title: 'Test clip',
+        extractor: 'test',
+        formats: [
+          _video('a', 1080),
+          _video('b', 4320, ext: 'webm', vcodec: 'av01'),
+        ],
+      ),
+      platform: SourcePlatform.youtube,
+      maxQuality: bestAvailableQuality,
+    )!;
+
+    expect(options.recommended.quality, 4320);
+    expect(options.reason, RecommendationReason.bestUpToCap);
+  });
+
+  group('web photos', () {
+    // Made-up URLs; no real media.
+    const photos = [
+      WebPhoto(
+        url: 'https://img.example.com/1.jpg?name=orig',
+        preview: 'https://img.example.com/1.jpg?name=small',
+        ext: 'jpg',
+        width: 4000,
+        height: 3000,
+        sizeBytes: 100,
+      ),
+      WebPhoto(url: 'https://img.example.com/2.png', ext: 'png'),
+      WebPhoto(url: 'https://img.example.com/3.jpg', ext: 'jpg'),
+    ];
+    const empty = MediaInfo(title: 'Test post', extractor: 'twitter');
+
+    test('saves the photos when yt-dlp found nothing', () {
+      final options = suggestDownloadOptions(
+        empty,
+        platform: SourcePlatform.x,
+        photos: photos,
+      )!;
+
+      expect(options.recommendedType, OutputType.image);
+      expect(options.reason, RecommendationReason.wholePost);
+      final option = options.recommended;
+      expect(option.formatSelector, photosSelector);
+      expect(option.count, 3);
+      expect(option.imageUrls, [for (final p in photos) p.url]);
+      // One photo's size is unknown, so the total is too.
+      expect(option.sizeBytes, isNull);
+      expect(options.postItems.map((i) => i.thumbnail), [
+        'https://img.example.com/1.jpg?name=small',
+        'https://img.example.com/2.png',
+        'https://img.example.com/3.jpg',
+      ]);
+    });
+
+    test('a single photo has its size and quality and no picker', () {
+      final options = suggestDownloadOptions(
+        empty,
+        platform: SourcePlatform.other,
+        photos: photos.take(1).toList(),
+      )!;
+
+      expect(options.reason, RecommendationReason.imageOnly);
+      expect(options.postItems, isEmpty);
+      expect(options.recommended.ext, 'jpg');
+      expect(options.recommended.quality, 3000);
+      expect(options.recommended.sizeBytes, 100);
+    });
+
+    test('picking some photos saves just those, numbered by place', () {
+      final options = suggestDownloadOptions(
+        empty,
+        platform: SourcePlatform.reddit,
+        photos: photos,
+      )!;
+
+      final option = options.optionFor([
+        options.postItems[2],
+        options.postItems[0],
+      ]);
+      expect(option.formatSelector, photosSelector);
+      expect(option.items, [1, 3]);
+      expect(option.imageUrls, [photos[0].url, photos[2].url]);
+      expect(options.postItemsOf(option), [
+        options.postItems[0],
+        options.postItems[2],
+      ]);
+    });
+
+    test('are the image choice next to a video', () {
+      final options = suggestDownloadOptions(
+        MediaInfo(
+          title: 'Test post',
+          extractor: 'twitter',
+          formats: [_video('v', 720, acodec: 'mp4a.40.2')],
+        ),
+        platform: SourcePlatform.x,
+        photos: photos,
+      )!;
+
+      expect(options.recommendedType, OutputType.video);
+      expect(options.types, contains(OutputType.image));
+      expect(options.defaultFor(OutputType.image).imageUrls, hasLength(3));
+      expect(options.postItems, isEmpty);
     });
   });
 }
