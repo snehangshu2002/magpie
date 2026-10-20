@@ -169,6 +169,21 @@ void main() {
     expect(updates.opened, ['https://github.com/snehangshu2002/magpie']);
   });
 
+  testWidgets('settings says what stays on the phone', (tester) async {
+    await pumpApp(tester);
+    await openSettings(tester);
+    await tester.scrollUntilVisible(
+      find.text('Your privacy'),
+      200,
+      scrollable: settingsList,
+    );
+
+    expect(
+      find.textContaining('stay on this phone. No account, no ads'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('settings shows the version and links to the developer', (
     tester,
   ) async {

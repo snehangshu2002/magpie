@@ -179,6 +179,11 @@ class SettingsScreen extends ConsumerWidget {
                 SectionLabel(l10n.settingsAbout),
                 _Group(
                   children: [
+                    _SettingTile(
+                      icon: Icons.shield_outlined,
+                      title: l10n.settingsPrivacy,
+                      subtitle: l10n.settingsPrivacyHint,
+                    ),
                     const _VersionTile(),
                     _SettingTile(
                       icon: SimpleIcons.github,
