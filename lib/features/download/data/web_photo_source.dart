@@ -6,10 +6,12 @@ import 'dart:typed_data';
 
 import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/features/download/domain/web_photo.dart';
+import 'package:media_downloader/features/intake/domain/detect_link.dart';
 
 /// Finds full-size photos that yt-dlp doesn't save: photos in posts on X
 /// (its public syndication endpoint, which yt-dlp also falls back to) and
-/// links that are an image themselves.
+/// in public Telegram channels (the post's embed page, which yt-dlp reads
+/// for videos), and links that are an image themselves.
 ///
 /// Methods throw [IOException], [TimeoutException] or [FormatException];
 /// the repository turns them into failures.
@@ -27,6 +29,7 @@ class WebPhotoSource {
     if (isImageLink(url)) return await imageAt(url);
     return await switch (platform) {
       SourcePlatform.x => _tweetPhotos(url),
+      SourcePlatform.telegram => _telegramPhotos(url),
       _ => Future.value(),
     };
   }
@@ -76,6 +79,23 @@ class WebPhotoSource {
       }),
     );
     return json is Map<String, dynamic> ? photosFromTweet(json) : null;
+  }
+
+  Future<WebPhotos?> _telegramPhotos(Uri url) async {
+    final post = telegramPostUri(url);
+    if (post == null) return null;
+    final html = await _withClient((client) async {
+      final embed = post.replace(
+        queryParameters: {'embed': '1', 'mode': 'tme'},
+      );
+      final response = await _send(client, 'GET', embed);
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException('HTTP ${response.statusCode}', uri: embed);
+      }
+      return body;
+    });
+    return photosFromTelegramEmbed(html);
   }
 
   Future<Object?> _getJson(Uri url) => _withClient((client) async {
@@ -258,3 +278,61 @@ WebPhoto _tweetPhoto(Uri url, Object? info) {
     },
   );
 }
+
+/// The photos of a public Telegram post (every photo of an album, in order)
+/// from its embed page (`t.me/<channel>/<id>?embed=1`); null when it has
+/// none. They are the largest copies Telegram shows without signing in.
+WebPhotos? photosFromTelegramEmbed(String html) {
+  final photos = [
+    for (final match in RegExp(
+      'class="tgme_widget_message_photo_wrap[^"]*"[^>]*?style="([^"]*)"',
+    ).allMatches(html))
+      ?_telegramPhoto(match[1]!),
+  ];
+  if (photos.isEmpty) return null;
+  final text = switch (RegExp(
+    '<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+    dotAll: true,
+  ).firstMatch(html)) {
+    final match? => _htmlText(match[1]!),
+    null => '',
+  };
+  final author = switch (RegExp(
+    'class="tgme_widget_message_author[^"]*".*?<span[^>]*>(.*?)</span>',
+    dotAll: true,
+  ).firstMatch(html)) {
+    final match? => _htmlText(match[1]!),
+    null => null,
+  };
+  return WebPhotos(
+    photos: photos,
+    title: text.isEmpty
+        ? author
+        : text.length > 72
+        ? '${text.substring(0, 72).trimRight()}…'
+        : text,
+  );
+}
+
+WebPhoto? _telegramPhoto(String style) {
+  final url = RegExp(r"background-image:url\('([^']+)'\)").firstMatch(style);
+  if (url == null) return null;
+  final width = RegExp(r'width:(\d+)px').firstMatch(style);
+  return WebPhoto(
+    url: url[1]!,
+    ext: imageExtOf(Uri.parse(url[1]!).path),
+    width: width == null ? null : int.parse(width[1]!),
+  );
+}
+
+/// [html] as plain text: tags dropped (`<br>` as a space), entities decoded.
+String _htmlText(String html) => html
+    .replaceAll(RegExp('<br ?/?>'), ' ')
+    .replaceAll(RegExp('<[^>]+>'), '')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();

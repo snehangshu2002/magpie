@@ -68,6 +68,18 @@ class StorageChannel {
       await _methods.invokeListMethod<String>('deleteFiles', {'uris': uris}) ??
       const [];
 
+  /// Saves [text] as `<targetDir>/<name>.txt` in shared storage; returns
+  /// its content URI.
+  Future<String> saveText({
+    required String name,
+    required String text,
+    required String targetDir,
+  }) async => (await _methods.invokeMethod<String>('saveText', {
+    'name': name,
+    'text': text,
+    'targetDir': targetDir,
+  }))!;
+
   /// Opens Android's folder picker at Download. The chosen folder's document
   /// id (`primary:Download/Videos`), or null if the user backed out.
   Future<String?> pickFolder() => _methods.invokeMethod<String>('pickFolder');

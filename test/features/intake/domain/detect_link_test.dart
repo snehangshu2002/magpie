@@ -147,6 +147,39 @@ void main() {
       );
     });
 
+    test('Telegram', () {
+      expectLink(
+        'https://t.me/testchannel/123',
+        SourcePlatform.telegram,
+        LinkKind.post,
+        uri: 'https://t.me/testchannel/123',
+      );
+      // Other forms of a public post become the one yt-dlp reads.
+      expectLink(
+        'https://telegram.me/testchannel/123?single',
+        SourcePlatform.telegram,
+        LinkKind.post,
+        uri: 'https://t.me/testchannel/123',
+      );
+      expectLink(
+        't.me/s/testchannel/123',
+        SourcePlatform.telegram,
+        LinkKind.post,
+        uri: 'https://t.me/testchannel/123',
+      );
+      // Private chats need an account; a channel link has no post.
+      expectLink(
+        'https://t.me/c/1234567/89',
+        SourcePlatform.telegram,
+        LinkKind.unknown,
+      );
+      expectLink(
+        'https://t.me/testchannel',
+        SourcePlatform.telegram,
+        LinkKind.unknown,
+      );
+    });
+
     test('does not mistake look-alike hosts for a site', () {
       expect(
         detectLink('https://notyoutube.com/watch?v=1')?.platform,

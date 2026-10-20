@@ -10,22 +10,47 @@ import 'package:media_downloader/core/platform/engine_channel.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
+import 'package:media_downloader/core/platform/storage_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/data/web_photo_source.dart';
 import 'package:media_downloader/features/download/domain/download_details.dart';
 import 'package:media_downloader/features/download/domain/media_repository.dart';
+import 'package:media_downloader/features/download/domain/transcript.dart';
 import 'package:media_downloader/features/download/domain/web_photo.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'media_repository_impl.g.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
-  new(this._channel, this._db, [WebPhotoSource? photos])
-    : _photos = photos ?? WebPhotoSource();
+  new(
+    this._channel,
+    this._db, [
+    WebPhotoSource? photos,
+    StorageChannel? storage,
+  ]) : _photos = photos ?? WebPhotoSource(),
+       _storage = storage ?? StorageChannel();
 
   final EngineChannel _channel;
   final AppDatabase _db;
   final WebPhotoSource _photos;
+  final StorageChannel _storage;
+
+  @override
+  Future<Result<String>> fetchTranscript(Uri url, CaptionTrack track) =>
+      guardPlatformCall(
+        () async => transcriptFromVtt(
+          await _channel.fetchTranscript(url.toString(), track),
+        ),
+      );
+
+  @override
+  Future<Result<String>> saveText({
+    required String name,
+    required String text,
+    required String targetDir,
+  }) => guardPlatformCall(
+    () => _storage.saveText(name: name, text: text, targetDir: targetDir),
+  );
 
   @override
   Future<Result<MediaInfo>> fetchInfo(Uri url) =>
@@ -98,4 +123,6 @@ class MediaRepositoryImpl implements MediaRepository {
 MediaRepository mediaRepository(Ref ref) => MediaRepositoryImpl(
   ref.watch(engineChannelProvider),
   ref.watch(appDatabaseProvider),
+  null,
+  ref.watch(storageChannelProvider),
 );

@@ -14,8 +14,8 @@ class SupportedPlatforms extends StatelessWidget {
     SourcePlatform.youtube,
     SourcePlatform.instagram,
     SourcePlatform.x,
-    SourcePlatform.reddit,
     SourcePlatform.facebook,
+    SourcePlatform.telegram,
   ];
 
   @override

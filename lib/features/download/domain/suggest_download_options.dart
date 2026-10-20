@@ -15,6 +15,7 @@ const int bestAvailableQuality = 1 << 20;
 
 const _imageExts = {'jpg', 'jpeg', 'png', 'webp', 'gif'};
 const _audioExts = {'m4a', 'mp3', 'opus', 'ogg', 'oga', 'aac', 'flac', 'wav'};
+const _videoExts = {'mp4', 'webm', 'mkv', 'mov', 'm4v', '3gp', 'flv', 'ts'};
 
 /// Turns yt-dlp's raw format list into the few choices people care about
 /// (one per video quality, one per audio container, images) and picks the
@@ -152,8 +153,10 @@ bool _known(String? codec) => codec != null && codec != 'none';
 
 /// yt-dlp writes `"none"` for a missing stream and leaves the field out when
 /// it doesn't know; a format with a height but no codec info is a video.
+/// Some sites (e.g. Telegram) report just a video file: no codecs, no size.
 bool _hasVideo(MediaFormat f) =>
-    _known(f.vcodec) || (f.vcodec == null && f.height != null);
+    _known(f.vcodec) ||
+    (f.vcodec == null && (f.height != null || _videoExts.contains(f.ext)));
 
 bool _isImage(MediaFormat f) =>
     _imageExts.contains(f.ext) && !_known(f.vcodec) && !_known(f.acodec);

@@ -16,6 +16,7 @@ import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
 import 'package:media_downloader/features/download/presentation/widgets/media_preview_card.dart';
+import 'package:media_downloader/features/download/presentation/widgets/post_text_card.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
@@ -138,6 +139,11 @@ class DownloadPanel extends ConsumerWidget {
                 [for (final type in options.types) ...options.of(type)].length,
               ),
         ),
+        if (preview.info.description != null ||
+            preview.info.captions.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          PostTextCard(url: url, preview: preview),
+        ],
         const SizedBox(height: 28),
         if (options.postItems.isNotEmpty) ...[
           _SectionHeader(

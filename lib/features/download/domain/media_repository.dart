@@ -19,6 +19,17 @@ abstract interface class MediaRepository {
   /// yt-dlp can't read.
   Future<Result<WebPhotos?>> fetchImage(Uri url);
 
+  /// The caption [track] of [url] as plain text (see `transcriptFromVtt`).
+  Future<Result<String>> fetchTranscript(Uri url, CaptionTrack track);
+
+  /// Saves [text] as `<targetDir>/<name>.txt` in shared storage; returns
+  /// its content URI.
+  Future<Result<String>> saveText({
+    required String name,
+    required String text,
+    required String targetDir,
+  });
+
   /// Queues a download and adds it to the history; returns its id.
   Future<Result<String>> startDownload(
     DownloadRequest request,

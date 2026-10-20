@@ -1,10 +1,12 @@
 package com.snehangshu.magpie.storage
 
+import android.Manifest
 import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
@@ -126,6 +128,14 @@ class StorageBridge(
             "deleteFiles" -> respond(result) { delete(call.requireUris()) }
 
             "pickFolder" -> respond(result) { pickFolder() }
+
+            "saveText" -> respond(result) {
+                saveText(
+                    name = call.requireString("name"),
+                    text = call.requireString("text"),
+                    targetDir = call.requireString("targetDir"),
+                )
+            }
 
             else -> result.notImplemented()
         }
@@ -276,6 +286,31 @@ class StorageBridge(
      * document id (`primary:Download/Videos`), or null if the user backed out;
      * Dart decides whether downloads can go there.
      */
+    /**
+     * Saves [text] as `<targetDir>/<name>.txt` in shared storage, like a
+     * download; returns its content URI. Before Android 10 this needs write
+     * access, asked for here.
+     */
+    private suspend fun saveText(name: String, text: String, targetDir: String): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            host.requestPermissions(listOf(Manifest.permission.WRITE_EXTERNAL_STORAGE))
+            if (context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                throw StorageException("Storage permission denied")
+            }
+        }
+        val safeName = name.replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_").trim().take(120)
+            .ifBlank { "text" }
+        val workDir = File(context.cacheDir, "text/${System.nanoTime()}").apply { mkdirs() }
+        try {
+            val file = File(workDir, "$safeName.txt").apply { writeText(text) }
+            return MediaStoreSaver.save(context, file, targetDir).toString()
+        } finally {
+            workDir.deleteRecursively()
+        }
+    }
+
     private suspend fun pickFolder(): String? {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

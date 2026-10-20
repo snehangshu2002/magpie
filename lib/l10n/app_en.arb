@@ -367,6 +367,35 @@
   "updateLater": "Later",
   "loading": "Loading…",
   "retry": "Retry",
+  "postTextDescription": "Description",
+  "postTextCaption": "Caption",
+  "postTextPost": "Post text",
+  "postTextCopy": "Copy",
+  "postTextCopied": "Copied",
+  "postTextMore": "Show more",
+  "postTextLess": "Show less",
+  "transcriptTitle": "Transcript",
+  "transcriptOpen": "Transcript",
+  "transcriptAuto": "{language} (auto)",
+  "@transcriptAuto": {
+    "placeholders": {
+      "language": {"type": "String"}
+    }
+  },
+  "transcriptEmpty": "This transcript has no words.",
+  "transcriptSave": "Save as text",
+  "transcriptFileName": "{title} (transcript)",
+  "@transcriptFileName": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "transcriptSaved": "Saved to {folder}",
+  "@transcriptSaved": {
+    "placeholders": {
+      "folder": {"type": "String"}
+    }
+  },
   "failureUnsupportedUrl": "This link isn't supported. Try a link to a single post or video.",
   "failureNetwork": "Network error. Check your connection and try again.",
   "failureEngine": "Couldn't download this link. Try again in a moment.",

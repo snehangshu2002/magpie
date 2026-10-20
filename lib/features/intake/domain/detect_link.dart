@@ -26,7 +26,9 @@ DetectedLink? detectLink(String input) {
 
     final kind = _kindOf(platform, host, uri);
     return DetectedLink(
-      uri: _withoutPlaylist(platform, kind, uri),
+      uri: platform == SourcePlatform.telegram
+          ? telegramPostUri(uri) ?? uri
+          : _withoutPlaylist(platform, kind, uri),
       platform: platform,
       kind: kind,
     );
@@ -98,9 +100,28 @@ LinkKind _kindOf(SourcePlatform platform, String host, Uri uri) {
         };
       }
       return LinkKind.unknown;
+    case SourcePlatform.telegram:
+      return telegramPostUri(uri) != null ? LinkKind.post : LinkKind.unknown;
     case SourcePlatform.other:
       return LinkKind.unknown;
   }
+}
+
+/// `https://t.me/<channel>/<id>`, the form yt-dlp reads, for a public
+/// channel post link: also `telegram.me` and the `t.me/s/<channel>/<id>`
+/// web preview. Null for anything else, e.g. private `t.me/c/...` links,
+/// which need a signed-in account.
+Uri? telegramPostUri(Uri uri) {
+  var path = [
+    for (final s in uri.pathSegments)
+      if (s.isNotEmpty) s,
+  ];
+  if (path.firstOrNull == 's') path = path.skip(1).toList();
+  if (path case [final channel, final id]
+      when channel != 'c' && RegExp(r'^\d+$').hasMatch(id)) {
+    return Uri.https('t.me', '/$channel/$id');
+  }
+  return null;
 }
 
 /// A YouTube video opened from a playlist carries `list=`, which makes
