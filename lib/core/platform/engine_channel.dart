@@ -33,6 +33,17 @@ class EngineChannel {
   Future<MediaInfo> fetchInfo(String url) async =>
       MediaInfo.fromJson(await _invokeMap('fetchInfo', {'url': url}));
 
+  /// The caption [track] of [url] as WebVTT text; the video isn't
+  /// downloaded. `NOT_FOUND` when the track has no file.
+  Future<String> fetchTranscript(String url, CaptionTrack track) async {
+    final reply = await _invokeMap('fetchTranscript', {
+      'url': url,
+      'lang': track.lang,
+      'auto': track.auto,
+    });
+    return reply['text'] as String;
+  }
+
   /// Returns the download id.
   Future<String> startDownload(DownloadRequest request) async {
     final reply = await _invokeMap('startDownload', request.toJson());

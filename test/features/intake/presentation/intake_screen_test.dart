@@ -111,6 +111,24 @@ class _FakeMediaRepository implements MediaRepository {
   @override
   Future<Result<WebPhotos?>> fetchImage(Uri url) async => const Ok(null);
 
+  /// What [fetchTranscript] returns.
+  Result<String> transcript = const Ok('Hello there');
+  final savedTexts = <String>[];
+
+  @override
+  Future<Result<String>> fetchTranscript(Uri url, CaptionTrack track) async =>
+      transcript;
+
+  @override
+  Future<Result<String>> saveText({
+    required String name,
+    required String text,
+    required String targetDir,
+  }) async {
+    savedTexts.add('$targetDir/$name.txt');
+    return const Ok('content://media/external/downloads/9');
+  }
+
   @override
   Future<Result<String>> startDownload(
     DownloadRequest request,

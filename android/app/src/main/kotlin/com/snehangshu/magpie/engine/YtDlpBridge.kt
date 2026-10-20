@@ -14,6 +14,8 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileNotFoundException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +74,15 @@ class YtDlpBridge(
             "fetchInfo" -> respond(result) {
                 Engine.ensureInitialized(context)
                 fetchInfo(call.requireString("url"))
+            }
+
+            "fetchTranscript" -> respond(result) {
+                Engine.ensureInitialized(context)
+                fetchTranscript(
+                    url = call.requireString("url"),
+                    lang = call.requireString("lang"),
+                    auto = call.argument<Boolean>("auto") ?: false,
+                )
             }
 
             "startDownload" -> respond(result) {
@@ -222,6 +233,8 @@ class YtDlpBridge(
             "duration" to json.positiveInt("duration"),
             "extractor" to (json.string("extractor") ?: entries?.firstNotNullOfOrNull { it.string("extractor") }),
             "formats" to json.formatsPayload(),
+            "description" to json.string("description")?.takeIf { it.isNotBlank() },
+            "captions" to json.captionsPayload(),
             "entries" to entries?.map {
                 mapOf(
                     "thumbnail" to it.string("thumbnail"),
@@ -230,6 +243,59 @@ class YtDlpBridge(
                 )
             },
         )
+    }
+
+    /**
+     * The caption tracks worth offering as a transcript: every subtitle the
+     * uploader added, and YouTube's automatic captions only in the video's
+     * own language (`<lang>-orig`, or [JSONObject] `language`), not the
+     * machine translations into every other language.
+     */
+    private fun JSONObject.captionsPayload(): List<Map<String, Any?>> {
+        fun tracks(key: String, auto: Boolean, keep: (String) -> Boolean) =
+            optJSONObject(key)?.let { tracks ->
+                tracks.keys().asSequence()
+                    .filter { it != "live_chat" && keep(it) }
+                    .map { lang ->
+                        mapOf(
+                            "lang" to lang,
+                            "name" to tracks.optJSONArray(lang)?.optJSONObject(0)?.string("name"),
+                            "auto" to auto,
+                        )
+                    }
+                    .toList()
+            }.orEmpty()
+
+        val language = string("language")
+        val own = tracks("automatic_captions", auto = true) { it.endsWith("-orig") }
+        return tracks("subtitles", auto = false) { true } +
+            own.ifEmpty { tracks("automatic_captions", auto = true) { it == language } }
+    }
+
+    /**
+     * The caption track [lang] of [url] as WebVTT text, without downloading
+     * the video; [auto] picks YouTube's automatic captions.
+     */
+    private fun fetchTranscript(url: String, lang: String, auto: Boolean): Map<String, Any?> {
+        val workDir = File(context.cacheDir, "transcripts/${System.nanoTime()}")
+        workDir.mkdirs()
+        try {
+            val request = YoutubeDLRequest(url).apply {
+                addOption("--skip-download")
+                addOption("--no-playlist")
+                addOption("--no-warnings")
+                addOption(if (auto) "--write-auto-subs" else "--write-subs")
+                addOption("--sub-langs", lang)
+                addOption("--sub-format", "vtt/best")
+                addOption("-o", File(workDir, "transcript.%(ext)s").absolutePath)
+            }
+            YoutubeDL.getInstance().execute(request)
+            val file = workDir.listFiles()?.firstOrNull { it.isFile }
+                ?: throw FileNotFoundException("No captions for $lang")
+            return mapOf("text" to file.readText(), "ext" to file.extension)
+        } finally {
+            workDir.deleteRecursively()
+        }
     }
 
     private fun JSONObject.formatsPayload(): List<Map<String, Any?>> =
