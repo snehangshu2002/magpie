@@ -286,12 +286,36 @@ void main() {
         (1, OutputType.image),
         (2, OutputType.video),
       ]);
-      final second = options.optionFor(options.postItems[1]);
+      final second = options.optionFor([options.postItems[1]]);
       expect(second.formatSelector, postSelector);
-      expect(second.item, 2);
+      expect(second.items, [2]);
+      expect(second.count, 1);
       expect(second.type, OutputType.video);
-      expect(options.postItemOf(second), options.postItems[1]);
-      expect(options.postItemOf(options.recommended), isNull);
+      expect(options.postItemsOf(second), [options.postItems[1]]);
+      expect(options.postItemsOf(options.recommended), isEmpty);
+    });
+
+    test('several items of a post can be saved, in post order', () {
+      final options = suggestPost([photo, clip, photo, photo])!;
+      final items = options.postItems;
+
+      final photos = options.optionFor([items[3], items[0]]);
+      expect(photos.items, [1, 4]);
+      expect(photos.count, 2);
+      expect(photos.type, OutputType.image);
+      expect(photos.ext, 'jpg');
+      expect(options.postItemsOf(photos), [items[0], items[3]]);
+
+      final mixed = options.optionFor([items[0], items[1]]);
+      expect(mixed.type, OutputType.video);
+      expect(mixed.ext, isNull);
+    });
+
+    test('picking none or all of the items saves the whole post', () {
+      final options = suggestPost([photo, clip])!;
+
+      expect(options.optionFor(const []), options.recommended);
+      expect(options.optionFor(options.postItems), options.recommended);
     });
 
     test('a skipped item keeps the places of the ones after it', () {

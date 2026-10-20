@@ -114,18 +114,19 @@ class DownloadPanel extends ConsumerWidget {
         ? list.take(_collapsedCount).toList()
         : list;
     final ext = selected.ext?.toUpperCase();
-    final picked = options.postItemOf(selected);
+    final picked = options.postItemsOf(selected);
+    final shown = picked.length == 1 ? picked.single : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         MediaPreviewCard(
-          // The preview follows the item picked from a post.
-          info: picked == null
+          // The preview follows the item picked from a post, if just one.
+          info: shown == null
               ? preview.info
               : preview.info.copyWith(
-                  thumbnail: picked.thumbnail ?? preview.info.thumbnail,
-                  duration: picked.duration,
+                  thumbnail: shown.thumbnail ?? preview.info.thumbnail,
+                  duration: shown.duration,
                 ),
           platform: preview.platform,
           availability:
@@ -138,9 +139,17 @@ class DownloadPanel extends ConsumerWidget {
         if (options.postItems.isNotEmpty) ...[
           _SectionHeader(
             title: l10n.postPickTitle,
-            trailing: picked == null
-                ? options.recommended.postLabel(l10n)
-                : l10n.postPickedItem(picked.index, options.postItems.length),
+            trailing: switch (picked) {
+              [] => options.recommended.postLabel(l10n),
+              [final item] => l10n.postPickedItem(
+                item.index,
+                options.postItems.length,
+              ),
+              _ => l10n.postPickedItems(
+                picked.length,
+                options.postItems.length,
+              ),
+            },
           ),
           const SizedBox(height: 10),
           _Dimmed(
@@ -153,7 +162,11 @@ class DownloadPanel extends ConsumerWidget {
                   : (item) => select(
                       item == null
                           ? options.recommended
-                          : options.optionFor(item),
+                          : options.optionFor(
+                              picked.contains(item)
+                                  ? picked.where((i) => i != item)
+                                  : [...picked, item],
+                            ),
                     ),
             ),
           ),
@@ -248,13 +261,14 @@ class DownloadPanel extends ConsumerWidget {
   }
 }
 
-/// The items of a post as thumbnails, after an "All" tile: tap one to save
-/// it alone. [picked] null means the whole post.
+/// The items of a post as thumbnails, after an "All" tile: tap items to
+/// pick or unpick them, "All" for the whole post. [picked] empty means the
+/// whole post. [onPicked] gets the tapped item, null for "All".
 class _PostItemPicker extends StatelessWidget {
   const new({required this.items, required this.picked, this.onPicked});
 
   final List<PostItem> items;
-  final PostItem? picked;
+  final List<PostItem> picked;
   final ValueChanged<PostItem?>? onPicked;
 
   static const _size = 88.0;
@@ -275,7 +289,7 @@ class _PostItemPicker extends StatelessWidget {
         itemBuilder: (context, i) {
           final item = i == 0 ? null : items[i - 1];
           return _PostItemTile(
-            selected: item == picked,
+            selected: item == null ? picked.isEmpty : picked.contains(item),
             label: item == null
                 ? l10n.postPickAll(items.length)
                 : l10n.postItemLabel(item.index, item.type.label(l10n)),

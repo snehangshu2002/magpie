@@ -28,8 +28,8 @@ abstract class DownloadOption with _$DownloadOption {
     /// Files saved: more than one for a whole post.
     @Default(1) int count,
 
-    /// 1-based item of a post to save alone; null saves the whole post.
-    int? item,
+    /// 1-based items of a post to save, in order; null saves the whole post.
+    List<int>? items,
   }) = _DownloadOption;
 }
 
@@ -69,8 +69,8 @@ abstract class DownloadOptions with _$DownloadOptions {
     /// Highest video quality picked by default (short side in pixels).
     required int maxQuality,
 
-    /// The items of a post with several, in order, so one can be saved
-    /// alone; empty otherwise.
+    /// The items of a post with several, in order, so some can be saved
+    /// without the rest; empty otherwise.
     @Default(<PostItem>[]) List<PostItem> postItems,
   }) = _DownloadOptions;
 }
@@ -101,16 +101,32 @@ extension DownloadOptionsX on DownloadOptions {
 
   DownloadOption get recommended => defaultFor(recommendedType);
 
-  /// Saves only [item] of the post.
-  DownloadOption optionFor(PostItem item) => DownloadOption(
-    type: item.type,
-    formatSelector: postSelector,
-    ext: item.type == OutputType.image ? 'jpg' : null,
-    item: item.index,
-  );
+  /// Saves only [items] of the post; the whole post when they are none or
+  /// all of them.
+  DownloadOption optionFor(Iterable<PostItem> items) {
+    final picked = [
+      for (final item in postItems)
+        if (items.contains(item)) item,
+    ];
+    if (picked.isEmpty || picked.length == postItems.length) {
+      return recommended;
+    }
+    final photos = picked.every((i) => i.type == OutputType.image);
+    return DownloadOption(
+      type: photos ? OutputType.image : OutputType.video,
+      formatSelector: postSelector,
+      ext: photos ? 'jpg' : null,
+      count: picked.length,
+      items: [for (final item in picked) item.index],
+    );
+  }
 
-  /// The post item [option] saves alone; null for the whole post.
-  PostItem? postItemOf(DownloadOption option) => option.item == null
-      ? null
-      : postItems.where((i) => i.index == option.item).firstOrNull;
+  /// The post items [option] saves, in order; empty for the whole post.
+  List<PostItem> postItemsOf(DownloadOption option) {
+    final items = option.items ?? const <int>[];
+    return [
+      for (final item in postItems)
+        if (items.contains(item.index)) item,
+    ];
+  }
 }

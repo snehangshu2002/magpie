@@ -35,8 +35,8 @@ data class DownloadRequest(
     val outputType: String,
     val targetDir: String,
     val title: String?,
-    /** 1-based item of a `post` to save alone; null saves every item. */
-    val item: Int? = null,
+    /** 1-based items of a `post` to save, in order; null saves every item. */
+    val items: List<Int>? = null,
 )
 
 /**
@@ -209,7 +209,7 @@ class DownloadService : Service() {
             addOption("--ignore-no-formats-error")
             addOption("--ignore-errors")
             addOption("--write-thumbnail")
-            task.request.item?.let { addOption("-I", it.toString()) }
+            task.request.items?.let { addOption("-I", it.joinToString(",")) }
             // "<index> <id>.<ext>"; ids have no spaces.
             addOption("-o", File(workDir, "%(playlist_index|0)s %(id)s.%(ext)s").absolutePath)
             addOption("--no-mtime")
@@ -255,13 +255,19 @@ class DownloadService : Service() {
         if (saved.isEmpty()) throw YoutubeDLException("yt-dlp finished without producing a file")
 
         val title = task.request.title?.let(::safeFileName)?.takeIf { it.isNotBlank() }
+        val picked = task.request.items?.sorted()
         return saved.mapIndexed { i, file ->
             // Instagram's photos are JPEGs whose URL ends in ".heic".
             val ext = MediaStoreSaver.imageExtensionOf(file) ?: file.extension
             val base = title ?: file.name.substringBefore('.').substringAfter(' ')
-            // One item keeps its place in the post, so items saved one by one
-            // don't all share the post's name.
-            val number = task.request.item ?: (i + 1).takeIf { saved.size > 1 }
+            // Picked items keep their place in the post, so items saved in
+            // separate runs don't all share the post's name. If one produced
+            // nothing, yt-dlp's playlist_index prefix still gives the place.
+            val number = when {
+                picked == null -> (i + 1).takeIf { saved.size > 1 }
+                saved.size == picked.size -> picked[i]
+                else -> file.name.substringBefore(' ').toIntOrNull()
+            }
             val name = if (number != null) "$base $number.$ext" else "$base.$ext"
             File(workDir, name).also { file.renameTo(it) }
         }
@@ -307,7 +313,7 @@ class DownloadService : Service() {
         outputType = getStringExtra(EXTRA_OUTPUT_TYPE) ?: return null,
         targetDir = getStringExtra(EXTRA_TARGET_DIR) ?: return null,
         title = getStringExtra(EXTRA_TITLE),
-        item = getIntExtra(EXTRA_ITEM, 0).takeIf { it > 0 },
+        items = getIntArrayExtra(EXTRA_ITEMS)?.toList()?.takeIf { it.isNotEmpty() },
     )
 
     companion object {
@@ -327,7 +333,7 @@ class DownloadService : Service() {
         private const val EXTRA_OUTPUT_TYPE = "outputType"
         private const val EXTRA_TARGET_DIR = "targetDir"
         private const val EXTRA_TITLE = "title"
-        private const val EXTRA_ITEM = "item"
+        private const val EXTRA_ITEMS = "items"
 
         private const val MAX_PARALLEL = 2
         private const val EVENT_INTERVAL_MS = 250L
@@ -359,7 +365,7 @@ class DownloadService : Service() {
                 .putExtra(EXTRA_OUTPUT_TYPE, request.outputType)
                 .putExtra(EXTRA_TARGET_DIR, request.targetDir)
                 .putExtra(EXTRA_TITLE, request.title)
-                .putExtra(EXTRA_ITEM, request.item ?: 0)
+                .putExtra(EXTRA_ITEMS, request.items?.toIntArray())
             ContextCompat.startForegroundService(context, intent)
         }
 

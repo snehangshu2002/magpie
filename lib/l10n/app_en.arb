@@ -115,6 +115,14 @@
       "count": {"type": "int"}
     }
   },
+  "postPickedItems": "{count} of {total} selected",
+  "@postPickedItems": {
+    "description": "Several items picked from a post, e.g. '3 of 10 selected'.",
+    "placeholders": {
+      "count": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
   "postItemLabel": "Item {index}, {kind}",
   "@postItemLabel": {
     "description": "Screen reader label of one picker tile, e.g. 'Item 2, Video'.",

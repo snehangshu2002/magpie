@@ -273,7 +273,7 @@ void main() {
 
     final request = media.requests.single;
     expect(request.formatId, postSelector);
-    expect(request.item, 2);
+    expect(request.items, [2]);
     expect(request.outputType, OutputType.video);
   });
 
@@ -285,7 +285,49 @@ void main() {
     await tester.tap(find.text('Download').first);
     await tester.pump(const Duration(seconds: 1));
 
-    expect(media.requests.single.item, isNull);
+    expect(media.requests.single.items, isNull);
+  });
+
+  testWidgets('several items of a post can be picked together', (tester) async {
+    media.info = _carousel;
+    await pumpApp(tester);
+    await submit(tester, 'https://www.instagram.com/p/test123/');
+
+    await tester.tap(find.bySemanticsLabel('Item 3, Video'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Item 1, Image'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 of 3 selected'), findsOneWidget);
+
+    // Tapping a picked item again leaves it out.
+    await tester.tap(find.bySemanticsLabel('Item 3, Video'));
+    await tester.pumpAndSettle();
+    expect(find.text('Item 1 of 3'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Item 2, Video'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Download').first);
+    await tester.pump(const Duration(seconds: 1));
+
+    final request = media.requests.single;
+    expect(request.formatId, postSelector);
+    expect(request.items, [1, 2]);
+    expect(request.outputType, OutputType.video);
+  });
+
+  testWidgets('picking every item saves the whole post', (tester) async {
+    media.info = _carousel;
+    await pumpApp(tester);
+    await submit(tester, 'https://www.instagram.com/p/test123/');
+
+    for (final label in ['Item 1, Image', 'Item 2, Video', 'Item 3, Video']) {
+      await tester.tap(find.bySemanticsLabel(label));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Download').first);
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(media.requests.single.items, isNull);
   });
 
   // The queued state shows a spinner, so these pump a fixed time instead of
