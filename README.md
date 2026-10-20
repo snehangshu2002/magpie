@@ -21,7 +21,7 @@
 ---
 
 Magpie is a free and open-source downloader for Android. Share a link from
-YouTube, Instagram, X (Twitter), Reddit or
+YouTube, Instagram, X (Twitter), Facebook, Telegram or
 [hundreds of other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md),
 choose what you want, and Magpie saves it to your phone's `Download` folder,
 where your gallery and file manager can see it.
@@ -36,16 +36,35 @@ No account. No ads. No tracking.
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/download.png" alt="Download screen: paste a link, with the supported sites listed" width="300">
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/settings.png" alt="Settings: theme, font, video quality, save location and automatic updates" width="300">
+  <img src="docs/screenshots/download.png" alt="Download screen: paste a link, with the supported sites listed" width="250">
+  &nbsp;
+  <img src="docs/screenshots/photos.png" alt="A post with four photos: pick all of them or just some, saved at full size" width="250">
+  &nbsp;
+  <img src="docs/screenshots/description.png" alt="A YouTube video with its description, a Copy button and the Transcript button" width="250">
 </p>
+<p align="center">
+  <img src="docs/screenshots/transcript.png" alt="Transcript sheet: choose a language, then copy the text or save it as a text file" width="250">
+  &nbsp;
+  <img src="docs/screenshots/settings.png" alt="Settings: video quality, save location, automatic updates and the privacy note" width="250">
+</p>
+<p align="center"><sub>Photos and video shown: NASA (public domain).</sub></p>
 
 ## Features
 
 - **Share or paste**: send a link from any app's share sheet, or paste it in.
 - **Pick what you want**: video in the quality you choose, audio only, or
-  photos, including every item of an Instagram carousel.
+  photos. From a post with several photos or videos, save all of them or
+  just the ones you pick.
+- **Best quality**: choose **Best available** to get the highest quality a
+  site offers, even above 4K. Photos from X posts and public Telegram
+  channels are saved at the largest size the site serves, and a direct link
+  to an image saves the full-size file.
+- **Descriptions and captions**: read a video's description, or the caption
+  or text of an Instagram, Facebook or X post, and copy it in one tap.
+- **YouTube transcripts**: read a video's transcript in any of its caption
+  languages, copy it, or save it as a text file next to your downloads.
+- **Fit for sharing**: make a smaller copy of a saved video, sized to send
+  in a chat app.
 - **Downloads that keep going**: downloads run in the background with a
   progress notification, so you can leave the app.
 - **Tidy folders**: files are saved to `Download/Magpie/<Site>/`, or to a
@@ -57,6 +76,8 @@ No account. No ads. No tracking.
 - **Update notifications**: Magpie tells you when a new version is out and
   fetches the right APK for your phone.
 - **Your look**: light, dark or system theme, and a choice of fonts.
+- **Private**: no account, no ads, no tracking; Settings shows what stays on
+  your phone and what Magpie connects to.
 
 ## Install
 
@@ -112,7 +133,8 @@ It only connects to:
   the app.
 
 Your files stay on your phone. Magpie never asks for access to all your
-files; it saves through Android's own media storage.
+files; it saves through Android's own media storage. The app says the same
+under **Settings → About → Your privacy**.
 
 ## Built with
 
