@@ -30,6 +30,9 @@ abstract class DownloadOption with _$DownloadOption {
 
     /// 1-based items of a post to save, in order; null saves the whole post.
     List<int>? items,
+
+    /// Full-size photos the engine downloads as they are ([photosSelector]).
+    List<String>? imageUrls,
   }) = _DownloadOption;
 }
 
@@ -45,6 +48,10 @@ typedef PostItem = ({
 /// `startDownload` selector that saves every item of the link: videos in
 /// the best quality, photos as they are.
 const postSelector = 'post';
+
+/// `startDownload` selector that saves `imageUrls`: full-size photos found
+/// outside yt-dlp (X, Reddit, links to an image).
+const photosSelector = 'images';
 
 /// Why [DownloadOptions.recommendedType] was picked; shown next to it.
 enum RecommendationReason {
@@ -110,6 +117,15 @@ extension DownloadOptionsX on DownloadOptions {
     ];
     if (picked.isEmpty || picked.length == postItems.length) {
       return recommended;
+    }
+    if (recommended.imageUrls case final urls?) {
+      return DownloadOption(
+        type: OutputType.image,
+        formatSelector: photosSelector,
+        count: picked.length,
+        items: [for (final item in picked) item.index],
+        imageUrls: [for (final item in picked) urls[item.index - 1]],
+      );
     }
     final photos = picked.every((i) => i.type == OutputType.image);
     return DownloadOption(

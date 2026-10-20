@@ -1,26 +1,55 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:media_downloader/core/db/app_database.dart';
+import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/errors/platform_failure.dart';
+import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/engine_channel.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/core/utils/result.dart';
+import 'package:media_downloader/features/download/data/web_photo_source.dart';
 import 'package:media_downloader/features/download/domain/download_details.dart';
 import 'package:media_downloader/features/download/domain/media_repository.dart';
+import 'package:media_downloader/features/download/domain/web_photo.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'media_repository_impl.g.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
-  new(this._channel, this._db);
+  new(this._channel, this._db, [WebPhotoSource? photos])
+    : _photos = photos ?? WebPhotoSource();
 
   final EngineChannel _channel;
   final AppDatabase _db;
+  final WebPhotoSource _photos;
 
   @override
   Future<Result<MediaInfo>> fetchInfo(Uri url) =>
       guardPlatformCall(() => _channel.fetchInfo(url.toString()));
+
+  @override
+  Future<Result<WebPhotos?>> fetchPhotos(Uri url, SourcePlatform platform) =>
+      _guardHttp(() => _photos.photosOf(url, platform));
+
+  @override
+  Future<Result<WebPhotos?>> fetchImage(Uri url) =>
+      _guardHttp(() => _photos.imageAt(url));
+
+  static Future<Result<T>> _guardHttp<T>(Future<T> Function() call) async {
+    try {
+      return Ok(await call());
+    } on IOException catch (e) {
+      return Err(Failure.network(detail: '$e'));
+    } on TimeoutException catch (e) {
+      return Err(Failure.network(detail: '$e'));
+    } on FormatException catch (e) {
+      return Err(Failure.unknown(detail: '$e'));
+    }
+  }
 
   @override
   Future<Result<String>> startDownload(

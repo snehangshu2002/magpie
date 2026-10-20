@@ -13,6 +13,7 @@ import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
+import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
 import 'package:media_downloader/features/download/presentation/widgets/media_preview_card.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
@@ -41,6 +42,8 @@ extension OutputTypeLabel on OutputType {
 
 extension RecommendationReasonText on RecommendationReason {
   String text(AppLocalizations l10n, int maxQuality) => switch (this) {
+    RecommendationReason.bestUpToCap when maxQuality == bestAvailableQuality =>
+      l10n.reasonBestAvailable,
     RecommendationReason.bestUpToCap => l10n.reasonBestUpToCap(maxQuality),
     RecommendationReason.closestToCap => l10n.reasonClosestToCap(maxQuality),
     RecommendationReason.musicSource => l10n.reasonMusicSource,

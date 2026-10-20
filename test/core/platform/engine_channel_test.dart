@@ -87,6 +87,7 @@ void main() {
       'targetDir': 'Download/App/Generic',
       'title': 'Test video',
       'items': null,
+      'imageUrls': null,
     });
   });
 

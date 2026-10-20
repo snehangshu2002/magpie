@@ -21,7 +21,12 @@ abstract class DownloadRequest with _$DownloadRequest {
     String? title,
 
     /// 1-based items of a `post` to save, in order; null saves every item.
+    /// For `images`, the place in the post of each of [imageUrls], which
+    /// numbers the files.
     List<int>? items,
+
+    /// Full-size photos an `images` download saves, in order.
+    List<String>? imageUrls,
   }) = _DownloadRequest;
 
   factory fromJson(Map<String, dynamic> json) =>

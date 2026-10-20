@@ -257,6 +257,9 @@ void main() {
     await openSettings(tester);
 
     await tapSetting(tester, 'Default video quality');
+    expect(find.text('Best available'), findsOneWidget);
+    // The sheet scrolls on small screens.
+    await tester.ensureVisible(find.text('720p'));
     await tester.tap(find.text('720p'));
     await tester.pumpAndSettle();
 

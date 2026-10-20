@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_downloader/app.dart';
 import 'package:media_downloader/core/errors/failure.dart';
+import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/engine_update_result.dart';
@@ -16,6 +17,7 @@ import 'package:media_downloader/features/download/data/media_repository_impl.da
 import 'package:media_downloader/features/download/domain/download_details.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/domain/media_repository.dart';
+import 'package:media_downloader/features/download/domain/web_photo.dart';
 import 'package:media_downloader/features/intake/presentation/widgets/supported_platforms.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/settings/data/engine_repository_impl.dart';
@@ -96,6 +98,18 @@ class _FakeMediaRepository implements MediaRepository {
     fetched.add(url);
     return Ok(info);
   }
+
+  /// What [fetchPhotos] returns.
+  WebPhotos? photos;
+
+  @override
+  Future<Result<WebPhotos?>> fetchPhotos(
+    Uri url,
+    SourcePlatform platform,
+  ) async => Ok(photos);
+
+  @override
+  Future<Result<WebPhotos?>> fetchImage(Uri url) async => const Ok(null);
 
   @override
   Future<Result<String>> startDownload(

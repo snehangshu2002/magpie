@@ -27,7 +27,15 @@ final class AppSettings {
   });
 
   /// Video qualities offered as the default cap, highest first.
-  static const qualities = [2160, 1440, 1080, 720, 480, 360];
+  static const List<int> qualities = [
+    bestAvailableQuality,
+    2160,
+    1440,
+    1080,
+    720,
+    480,
+    360,
+  ];
 
   /// Highest video quality picked by default (short side in pixels).
   final int maxQuality;

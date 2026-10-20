@@ -9,6 +9,7 @@ import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/page_header.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
+import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
 import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
@@ -117,14 +118,17 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingTile(
                       title: l10n.settingsDefaultQuality,
                       subtitle: l10n.settingsDefaultQualityHint,
-                      value: l10n.qualityLabel(settings.maxQuality),
+                      value: _maxQualityLabel(l10n, settings.maxQuality),
                       onTap: () async {
                         final quality = await _choose(
                           context,
                           title: l10n.settingsDefaultQuality,
                           values: AppSettings.qualities,
                           selected: settings.maxQuality,
-                          label: l10n.qualityLabel,
+                          label: (q) => _maxQualityLabel(l10n, q),
+                          hint: (q) => q == bestAvailableQuality
+                              ? l10n.qualityBestHint
+                              : null,
                         );
                         if (quality != null) {
                           await controller.change(
@@ -286,7 +290,7 @@ class SettingsScreen extends ConsumerWidget {
     required List<T> values,
     required T selected,
     required String Function(T) label,
-    String Function(T)? hint,
+    String? Function(T)? hint,
     TextStyle? Function(T)? style,
   }) => showModalBottomSheet<T>(
     context: context,
@@ -309,9 +313,10 @@ class SettingsScreen extends ConsumerWidget {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
                   selected: value == selected,
                   title: Text(label(value), style: style?.call(value)),
-                  subtitle: hint == null
-                      ? null
-                      : Text(hint(value), style: style?.call(value)),
+                  subtitle: switch (hint?.call(value)) {
+                    final hint? => Text(hint, style: style?.call(value)),
+                    null => null,
+                  },
                   trailing: value == selected
                       ? Icon(Icons.check_rounded, color: scheme.primary)
                       : null,
@@ -489,3 +494,9 @@ class _SettingTile extends StatelessWidget {
     );
   }
 }
+
+/// "1080p", or "Best available" for no cap.
+String _maxQualityLabel(AppLocalizations l10n, int quality) =>
+    quality == bestAvailableQuality
+    ? l10n.qualityBest
+    : l10n.qualityLabel(quality);
