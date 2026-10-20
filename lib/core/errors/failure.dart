@@ -20,6 +20,12 @@ sealed class Failure with _$Failure implements Exception {
   /// No installed app can open or share the file.
   const factory noApp({String? detail}) = NoAppFailure;
 
+  /// A video couldn't be made small enough for the size asked for.
+  const factory tooLarge({String? detail}) = TooLargeFailure;
+
+  /// Re-encoding a saved video failed.
+  const factory encode({String? detail}) = EncodeFailure;
+
   /// The native side doesn't implement the call yet (e.g. a feature that
   /// hasn't shipped in this build).
   const factory unavailable({String? detail}) = UnavailableFailure;

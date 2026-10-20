@@ -370,5 +370,42 @@
   "failureNotFound": "This file was moved or deleted.",
   "failureNoApp": "No app on this device can open this file. Install a video or photo player and try again.",
   "failureUnavailable": "This isn't available right now. Try again later.",
-  "failureUnknown": "Something went wrong. Try again."
+  "failureUnknown": "Something went wrong. Try again.",
+  "failureTooLarge": "Couldn't get this video under that size. Pick a bigger size.",
+  "failureEncode": "Couldn't make a smaller copy of this video. Try again.",
+  "fitTitle": "Fit for sharing",
+  "fitHint": "Make a smaller copy that fits an app's size limit",
+  "fitIntro": "Chat apps and email limit how big a video can be. Pick a size, and Magpie makes a copy that stays under it.",
+  "fitSizeDiscord": "Discord without Nitro",
+  "fitOutcome": "{quality}, about {size}",
+  "@fitOutcome": {
+    "placeholders": {
+      "quality": {"type": "String"},
+      "size": {"type": "String"}
+    }
+  },
+  "fitAlreadyFits": "Already small enough",
+  "fitTooLong": "Too long for this size",
+  "fitNoLength": "Couldn't read this video's length, so it can't be resized.",
+  "fitStart": "Make copy",
+  "fitShareAsIs": "Share as is",
+  "fitWorking": "Making a smaller copy…",
+  "fitWorkingNote": "You can close this. It keeps going and shows up in your Library.",
+  "fitDone": "Ready to share",
+  "fitDoneNote": "Saved next to the original as “{name}”.",
+  "@fitDoneNote": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "fitShare": "Share",
+  "fitClose": "Done",
+  "fitTryAgain": "Try again",
+  "fitCopyTitle": "{title} ({size})",
+  "@fitCopyTitle": {
+    "placeholders": {
+      "title": {"type": "String"},
+      "size": {"type": "String"}
+    }
+  }
 }

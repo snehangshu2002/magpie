@@ -88,6 +88,28 @@ class YtDlpBridge(
                 mapOf("id" to request.id)
             }
 
+            "fitVideo" -> respond(result) {
+                val request = DownloadRequest(
+                    id = call.requireString("id"),
+                    url = call.requireString("uri"),
+                    formatId = FORMAT_FIT,
+                    outputType = "video",
+                    targetDir = call.requireString("targetDir"),
+                    title = call.argument<String>("title"),
+                    fit = FitSpec(
+                        targetBytes = call.requireLong("targetBytes"),
+                        durationMs = call.requireLong("durationMs"),
+                        videoKbps = call.requireInt("videoKbps"),
+                        audioKbps = call.requireInt("audioKbps"),
+                        maxShortSide = call.requireInt("maxShortSide"),
+                        name = call.requireString("name"),
+                    ),
+                )
+                requestDownloadPermissions()
+                withContext(Dispatchers.Main) { DownloadService.start(context, request) }
+                mapOf("id" to request.id)
+            }
+
             "cancelDownload" -> respond(result) {
                 withContext(Dispatchers.Main) {
                     DownloadService.cancel(context, call.requireString("id"))
@@ -166,6 +188,13 @@ class YtDlpBridge(
     private fun MethodCall.requireString(key: String): String =
         argument<String>(key) ?: throw IllegalArgumentException("Missing argument: $key")
 
+    private fun MethodCall.requireInt(key: String): Int =
+        argument<Number>(key)?.toInt() ?: throw IllegalArgumentException("Missing argument: $key")
+
+    // Dart ints arrive as Integer or Long depending on their size.
+    private fun MethodCall.requireLong(key: String): Long =
+        argument<Number>(key)?.toLong() ?: throw IllegalArgumentException("Missing argument: $key")
+
     /**
      * yt-dlp's JSON for [url]. `-J` keeps a post with several items (an
      * Instagram carousel) as one result with `entries`; items without formats
@@ -229,5 +258,8 @@ class YtDlpBridge(
         const val METHOD_CHANNEL = "app/engine"
         const val PROGRESS_CHANNEL = "app/engine/progress"
         const val TAG = "YtDlpBridge"
+
+        /** `formatId` recorded for a `fitVideo` job; nothing is downloaded. */
+        const val FORMAT_FIT = "fit"
     }
 }

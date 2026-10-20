@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
@@ -14,6 +15,7 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
+import java.io.FileNotFoundException
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -37,11 +39,17 @@ data class DownloadRequest(
     val title: String?,
     /** 1-based items of a `post` to save, in order; null saves every item. */
     val items: List<Int>? = null,
+    /**
+     * Set for a `fitVideo` job: [url] is then the content URI of a saved
+     * video to re-encode, not a link.
+     */
+    val fit: FitSpec? = null,
 )
 
 /**
- * Runs yt-dlp downloads in a `dataSync` foreground service so they survive the
- * app being backgrounded, then copies each file into shared storage.
+ * Runs yt-dlp downloads, and FFmpeg re-encodes of saved videos (`fitVideo`),
+ * in a foreground service so they survive the app being backgrounded, then
+ * copies each file into shared storage.
  * Reports progress through [DownloadEvents] and a notification.
  */
 class DownloadService : Service() {
@@ -51,6 +59,9 @@ class DownloadService : Service() {
     // Touched from the main thread (start, cancel, finish) and IO (progress).
     private val tasks = ConcurrentHashMap<String, DownloadTask>()
     private val jobs = ConcurrentHashMap<String, Job>()
+
+    // FFmpeg processes of running `fitVideo` jobs, killed on cancel.
+    private val processes = ConcurrentHashMap<String, Process>()
     private var lastStartId = 0
 
     private lateinit var notifications: DownloadNotifications
@@ -87,6 +98,7 @@ class DownloadService : Service() {
 
     override fun onDestroy() {
         jobs.keys.forEach { YoutubeDL.getInstance().destroyProcessById(it) }
+        processes.values.forEach(Process::destroy)
         scope.cancel()
         activeIds.clear()
         super.onDestroy()
@@ -97,7 +109,11 @@ class DownloadService : Service() {
             this,
             DownloadNotifications.FOREGROUND_ID,
             notifications.progress(tasks.values),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                // Re-encoding videos is media processing, not a data transfer.
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             } else {
                 0
@@ -119,7 +135,7 @@ class DownloadService : Service() {
                 throw e
             } catch (e: Exception) {
                 val error = EngineErrors.from(e)
-                if (error.code == EngineErrors.CANCELLED) {
+                if (error.code == EngineErrors.CANCELLED || task.cancelRequested) {
                     task.state = STATE_CANCELLED
                 } else {
                     task.state = STATE_FAILED
@@ -132,8 +148,10 @@ class DownloadService : Service() {
     }
 
     private fun cancel(id: String) {
-        // Kills a running yt-dlp process; cancelling the job covers a queued one.
+        // Kills a running yt-dlp or FFmpeg process; cancelling the job covers a queued one.
+        tasks[id]?.cancelRequested = true
         YoutubeDL.getInstance().destroyProcessById(id)
+        processes[id]?.destroy()
         jobs[id]?.cancel()
     }
 
@@ -146,10 +164,11 @@ class DownloadService : Service() {
             task.state = STATE_RUNNING
             publish(task, force = true)
 
-            val files = if (task.request.formatId == FORMAT_POST) {
-                downloadPost(task, workDir)
-            } else {
-                listOf(downloadFormat(task, workDir))
+            val fit = task.request.fit
+            val files = when {
+                fit != null -> listOf(fitVideo(task, fit, workDir))
+                task.request.formatId == FORMAT_POST -> downloadPost(task, workDir)
+                else -> listOf(downloadFormat(task, workDir))
             }
             task.state = STATE_MERGING
             task.percent = 100f
@@ -273,6 +292,41 @@ class DownloadService : Service() {
         }
     }
 
+    /**
+     * Re-encodes the saved video at [DownloadRequest.url] (a content URI) to
+     * fit [spec]; returns `<name>.mp4`. FFmpeg can't read content URIs, so
+     * the video is copied into [workDir] first.
+     */
+    private fun fitVideo(task: DownloadTask, spec: FitSpec, workDir: File): File {
+        val input = File(workDir, "input")
+        val source = contentResolver.openInputStream(Uri.parse(task.request.url))
+            ?: throw FileNotFoundException(task.request.url)
+        source.use { from -> input.outputStream().use { from.copyTo(it) } }
+
+        val name = safeFileName(spec.name).ifBlank { "video" }
+        val output = File(workDir, "$name.mp4")
+        try {
+            VideoFitter(this).fit(
+                input,
+                output,
+                spec,
+                onStart = { process ->
+                    processes[task.id] = process
+                    // Cancelled before FFmpeg started.
+                    if (task.cancelRequested) process.destroy()
+                },
+                onProgress = { percent ->
+                    task.percent = percent
+                    publish(task)
+                },
+            )
+        } finally {
+            processes.remove(task.id)
+            input.delete()
+        }
+        return output
+    }
+
     /** Runs on the main thread once [task] has saved, failed or been cancelled. */
     private fun finish(task: DownloadTask) {
         tasks.remove(task.id)
@@ -314,6 +368,16 @@ class DownloadService : Service() {
         targetDir = getStringExtra(EXTRA_TARGET_DIR) ?: return null,
         title = getStringExtra(EXTRA_TITLE),
         items = getIntArrayExtra(EXTRA_ITEMS)?.toList()?.takeIf { it.isNotEmpty() },
+        fit = getStringExtra(EXTRA_FIT_NAME)?.let { name ->
+            FitSpec(
+                targetBytes = getLongExtra(EXTRA_FIT_TARGET_BYTES, 0),
+                durationMs = getLongExtra(EXTRA_FIT_DURATION_MS, 0),
+                videoKbps = getIntExtra(EXTRA_FIT_VIDEO_KBPS, 0),
+                audioKbps = getIntExtra(EXTRA_FIT_AUDIO_KBPS, 0),
+                maxShortSide = getIntExtra(EXTRA_FIT_MAX_SHORT_SIDE, 0),
+                name = name,
+            )
+        },
     )
 
     companion object {
@@ -334,6 +398,12 @@ class DownloadService : Service() {
         private const val EXTRA_TARGET_DIR = "targetDir"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_ITEMS = "items"
+        private const val EXTRA_FIT_TARGET_BYTES = "fitTargetBytes"
+        private const val EXTRA_FIT_DURATION_MS = "fitDurationMs"
+        private const val EXTRA_FIT_VIDEO_KBPS = "fitVideoKbps"
+        private const val EXTRA_FIT_AUDIO_KBPS = "fitAudioKbps"
+        private const val EXTRA_FIT_MAX_SHORT_SIDE = "fitMaxShortSide"
+        private const val EXTRA_FIT_NAME = "fitName"
 
         private const val MAX_PARALLEL = 2
         private const val EVENT_INTERVAL_MS = 250L
@@ -366,6 +436,14 @@ class DownloadService : Service() {
                 .putExtra(EXTRA_TARGET_DIR, request.targetDir)
                 .putExtra(EXTRA_TITLE, request.title)
                 .putExtra(EXTRA_ITEMS, request.items?.toIntArray())
+            request.fit?.let { fit ->
+                intent.putExtra(EXTRA_FIT_TARGET_BYTES, fit.targetBytes)
+                    .putExtra(EXTRA_FIT_DURATION_MS, fit.durationMs)
+                    .putExtra(EXTRA_FIT_VIDEO_KBPS, fit.videoKbps)
+                    .putExtra(EXTRA_FIT_AUDIO_KBPS, fit.audioKbps)
+                    .putExtra(EXTRA_FIT_MAX_SHORT_SIDE, fit.maxShortSide)
+                    .putExtra(EXTRA_FIT_NAME, fit.name)
+            }
             ContextCompat.startForegroundService(context, intent)
         }
 
@@ -394,6 +472,9 @@ internal class DownloadTask(val request: DownloadRequest) {
     @Volatile var filePaths: List<String>? = null
     @Volatile var mimeType: String? = null
     @Volatile var error: String? = null
+
+    /** Set by a cancel, so a process it kills counts as cancelled, not failed. */
+    @Volatile var cancelRequested = false
 
     var publishedAt = 0L
     var publishedState: String? = null

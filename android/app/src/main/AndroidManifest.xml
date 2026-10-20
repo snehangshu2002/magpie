@@ -3,6 +3,8 @@
     <!-- DownloadService keeps downloads running while the app is in the background. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Android 15+: re-encoding a video to fit a size (fitVideo) is media processing. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Saving to Download/ before Android 10; MediaStore needs no permission after that. -->
     <uses-permission
@@ -44,7 +46,7 @@
         <service
             android:name=".engine.DownloadService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|mediaProcessing" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
 import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -119,6 +120,8 @@ class StorageBridge(
                 launch(Intent.createChooser(send, call.argument<String>("title")))
                 null
             }
+
+            "probeVideo" -> respond(result) { probeVideo(requireExisting(call.requireString("uri"))) }
 
             "deleteFiles" -> respond(result) { delete(call.requireUris()) }
 
@@ -239,6 +242,30 @@ class StorageBridge(
             gone += needConsent
         }
         return gone.map(Uri::toString)
+    }
+
+    /**
+     * `{durationMs, width, height, hasAudio}` of a saved video; each is null
+     * when the file doesn't say. Width and height are as stored, before any
+     * rotation.
+     */
+    private fun probeVideo(uri: Uri): Map<String, Any?> {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            fun number(key: Int) = retriever.extractMetadata(key)?.toLongOrNull()?.takeIf { it > 0 }
+            return mapOf(
+                "durationMs" to number(MediaMetadataRetriever.METADATA_KEY_DURATION),
+                "width" to number(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt(),
+                "height" to number(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt(),
+                "hasAudio" to (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes"),
+            )
+        } catch (e: RuntimeException) {
+            // setDataSource throws IllegalArgumentException/RuntimeException for unreadable files.
+            throw StorageException("Couldn't read $uri", e)
+        } finally {
+            retriever.release()
+        }
     }
 
     private fun requireExisting(uri: String): Uri =

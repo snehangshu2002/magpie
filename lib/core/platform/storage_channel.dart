@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:media_downloader/core/platform/channel_json.dart';
 import 'package:media_downloader/core/platform/models/stored_file.dart';
+import 'package:media_downloader/core/platform/models/video_probe.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'storage_channel.g.dart';
@@ -40,6 +41,12 @@ class StorageChannel {
   /// A JPEG preview about [size] pixels across, or null if there is none.
   Future<Uint8List?> thumbnail(String uri, {int size = 256}) =>
       _methods.invokeMethod<Uint8List>('thumbnail', {'uri': uri, 'size': size});
+
+  /// Length, size in pixels and whether there's sound, of the video at
+  /// [uri]; `NOT_FOUND` if it is gone.
+  Future<VideoProbe> probeVideo(String uri) async => VideoProbe.fromJson(
+    jsonMap(await _methods.invokeMethod<Object?>('probeVideo', {'uri': uri})),
+  );
 
   Future<void> openFile(String uri, {String? mimeType}) => _methods
       .invokeMethod<void>('openFile', {'uri': uri, 'mimeType': mimeType});
