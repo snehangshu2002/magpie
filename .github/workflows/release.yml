@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       notes:
-        description: "What's new, shown in the app. Optional; separate points with ;"
+        description: "What's new, shown in the app. Optional; separate points with ; or ' - '"
         required: false
         default: ''
 
@@ -90,8 +90,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NOTES: ${{ inputs.notes }}
         run: |
-          # "a; - b" -> "- a\n- b": the app shows each "- " line as a point, and nothing when empty.
-          printf '%s' "$NOTES" | tr ';' '\n' \
+          # "a; b" or "a - b" -> "- a\n- b": the app shows each "- " line as a point, and nothing
+          # when empty. Only a spaced dash splits, so "built-in" stays one word.
+          printf '%s' "$NOTES" | sed 's/ - /;/g' | tr ';' '\n' \
             | sed -E 's/^[[:space:]]*([-*•][[:space:]]*)?//; s/[[:space:]]+$//; /^$/d; s/^/- /' > notes.md
           gh release create "v$VERSION" build/app/outputs/flutter-apk/magpie-*.apk \
             --target "$GITHUB_SHA" --title "Magpie $VERSION" --notes-file notes.md
