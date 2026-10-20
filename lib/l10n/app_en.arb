@@ -339,6 +339,8 @@
   "settingsAutoUpdateFailed": "Couldn't update. Check your connection",
   "settingsAbout": "About",
   "settingsSourceCode": "Source code on GitHub",
+  "settingsDeveloper": "Developer",
+  "settingsVersion": "Version",
   "settingsLicenses": "Open-source licenses",
   "settingsFooter": "{appName} is free and open source. Respect creators and only save what you have the right to.",
   "@settingsFooter": {

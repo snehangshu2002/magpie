@@ -1,7 +1,10 @@
 import 'package:media_downloader/core/utils/result.dart';
 
+/// The developer's GitHub account.
+const projectOwner = 'snehangshu2002';
+
 /// The app's GitHub repository (`owner/name`): its source and releases.
-const projectRepo = 'snehangshu2002/magpie';
+const projectRepo = '$projectOwner/magpie';
 
 /// A release newer than the installed app.
 class AppUpdate {
@@ -34,6 +37,9 @@ abstract interface class UpdateRepository {
   /// The latest GitHub release if it is newer than the installed app, else
   /// null.
   Future<Result<AppUpdate?>> check();
+
+  /// The installed app's version name (e.g. `1.1.0`).
+  Future<Result<String>> installedVersion();
 
   /// Opens [url] (an update's APK or release page) in the browser.
   Future<Result<void>> open(String url);

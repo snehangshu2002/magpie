@@ -11,6 +11,7 @@ import 'package:media_downloader/features/settings/data/engine_repository_impl.d
 import 'package:media_downloader/features/settings/data/settings_repository_impl.dart';
 import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/domain/engine_repository.dart';
+import 'package:media_downloader/features/settings/presentation/settings_screen.dart';
 import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
 import 'package:media_downloader/features/updater/domain/app_update.dart';
 
@@ -47,6 +48,9 @@ class _FakeUpdateRepository implements UpdateRepository {
 
   @override
   Future<Result<AppUpdate?>> check() async => Ok(update);
+
+  @override
+  Future<Result<String>> installedVersion() async => const Ok('1.1.0');
 
   @override
   Future<Result<void>> open(String url) async {
@@ -87,6 +91,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // The sections sit in a PageView, so name the list to scroll.
+  final settingsList = find
+      .descendant(
+        of: find.byType(SettingsScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+
   Future<void> tapSetting(WidgetTester tester, String title) async {
     await tester.ensureVisible(find.text(title));
     await tester.pumpAndSettle();
@@ -126,15 +138,53 @@ void main() {
     expect(find.text('Magpie 1.2.0 is available'), findsNothing);
   });
 
-  testWidgets('settings links to the source code', (tester) async {
+  testWidgets('swiping left and right moves between sections', (tester) async {
+    await pumpApp(tester);
+    await tester.pumpAndSettle();
+    NavigationBar nav() => tester.widget(find.byType(NavigationBar));
+    expect(nav().selectedIndex, 0);
+
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(nav().selectedIndex, 1);
+
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(nav().selectedIndex, 2);
+    expect(find.byTooltip('Source code on GitHub'), findsOneWidget);
+
+    await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(nav().selectedIndex, 1);
+  });
+
+  testWidgets('settings has a GitHub button at the top', (tester) async {
     final updates = _FakeUpdateRepository();
     await pumpApp(tester, updates: updates);
     await openSettings(tester);
-    await tester.scrollUntilVisible(find.text('Source code on GitHub'), 200);
 
-    await tapSetting(tester, 'Source code on GitHub');
+    await tester.tap(find.byTooltip('Source code on GitHub'));
+    await tester.pumpAndSettle();
 
     expect(updates.opened, ['https://github.com/snehangshu2002/magpie']);
+  });
+
+  testWidgets('settings shows the version and links to the developer', (
+    tester,
+  ) async {
+    final updates = _FakeUpdateRepository();
+    await pumpApp(tester, updates: updates);
+    await openSettings(tester);
+    await tester.scrollUntilVisible(
+      find.text('Developer'),
+      200,
+      scrollable: settingsList,
+    );
+
+    expect(find.text('1.1.0'), findsOneWidget);
+    await tapSetting(tester, 'Developer');
+
+    expect(updates.opened, ['https://github.com/snehangshu2002']);
   });
 
   testWidgets('a release without notes only offers the update', (tester) async {
@@ -159,7 +209,11 @@ void main() {
   ) async {
     await pumpApp(tester);
     await openSettings(tester);
-    await tester.scrollUntilVisible(find.text('Automatic updates'), 200);
+    await tester.scrollUntilVisible(
+      find.text('Automatic updates'),
+      200,
+      scrollable: settingsList,
+    );
 
     expect(find.text('Automatic updates'), findsOneWidget);
     expect(
@@ -174,7 +228,11 @@ void main() {
     final engine = _FakeEngineRepository(const Err(Failure.network()));
     await pumpApp(tester, engine: engine);
     await openSettings(tester);
-    await tester.scrollUntilVisible(find.text('Automatic updates'), 200);
+    await tester.scrollUntilVisible(
+      find.text('Automatic updates'),
+      200,
+      scrollable: settingsList,
+    );
 
     expect(find.text("Couldn't update. Check your connection"), findsOneWidget);
 
