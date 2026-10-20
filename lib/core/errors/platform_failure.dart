@@ -13,6 +13,8 @@ abstract final class NativeErrorCode {
   static const cancelled = 'CANCELLED';
   static const notFound = 'NOT_FOUND';
   static const noApp = 'NO_APP';
+  static const tooLarge = 'TOO_LARGE';
+  static const encode = 'ENCODE';
 }
 
 Failure failureFromPlatformException(PlatformException e) =>
@@ -28,6 +30,8 @@ Failure failureFromNativeCode(String? code, [String? detail]) => switch (code) {
   NativeErrorCode.cancelled => const Failure.cancelled(),
   NativeErrorCode.notFound => Failure.notFound(detail: detail),
   NativeErrorCode.noApp => Failure.noApp(detail: detail),
+  NativeErrorCode.tooLarge => Failure.tooLarge(detail: detail),
+  NativeErrorCode.encode => Failure.encode(detail: detail),
   _ => Failure.unknown(detail: '$code: $detail'),
 };
 

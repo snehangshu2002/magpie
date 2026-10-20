@@ -30,6 +30,14 @@ void main() {
       isA<CancelledFailure>(),
     );
     expect(
+      await failureFor(PlatformException(code: NativeErrorCode.tooLarge)),
+      isA<TooLargeFailure>(),
+    );
+    expect(
+      await failureFor(PlatformException(code: NativeErrorCode.encode)),
+      isA<EncodeFailure>(),
+    );
+    expect(
       await failureFor(PlatformException(code: 'SOMETHING_NEW')),
       isA<UnknownFailure>(),
     );

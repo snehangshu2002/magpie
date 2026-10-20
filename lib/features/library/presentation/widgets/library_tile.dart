@@ -10,6 +10,7 @@ import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/pressable_scale.dart';
+import 'package:media_downloader/features/fit/presentation/fit_sheet.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/presentation/library_actions.dart';
@@ -137,6 +138,8 @@ class LibraryTile extends ConsumerWidget {
   Future<void> _showActions(BuildContext context, WidgetRef ref) async {
     final action = await showModalBottomSheet<_Action>(
       context: context,
+      // As tall as its rows, not capped at the default 9/16 of the screen.
+      isScrollControlled: true,
       builder: (context) => _ActionSheet(item: item),
     );
     if (action == null || !context.mounted) return;
@@ -145,6 +148,8 @@ class LibraryTile extends ConsumerWidget {
         await _open(context, ref);
       case _Action.share:
         await shareLibraryItems(context, ref, [item]);
+      case _Action.fit:
+        await showFitSheet(context, item);
       case _Action.copyLink:
         final messenger = ScaffoldMessenger.of(context);
         final copied = context.l10n.libraryLinkCopied;
@@ -171,7 +176,7 @@ class LibraryTile extends ConsumerWidget {
   }
 }
 
-enum _Action { open, share, copyLink, delete }
+enum _Action { open, share, fit, copyLink, delete }
 
 /// The file at the top, then what can be done with it.
 class _ActionSheet extends StatelessWidget {
@@ -256,6 +261,13 @@ class _ActionSheet extends StatelessWidget {
               subtitle: l10n.libraryShareHint,
               onTap: () => Navigator.pop(context, _Action.share),
             ),
+            if (item.type == OutputType.video)
+              _ActionTile(
+                icon: Icons.compress_rounded,
+                title: l10n.fitTitle,
+                subtitle: l10n.fitHint,
+                onTap: () => Navigator.pop(context, _Action.fit),
+              ),
             _ActionTile(
               icon: Icons.link_rounded,
               title: l10n.libraryCopyLink,

@@ -4,6 +4,7 @@ import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/engine_info.dart';
 import 'package:media_downloader/core/platform/models/engine_update_result.dart';
+import 'package:media_downloader/core/platform/models/fit_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -35,6 +36,14 @@ class EngineChannel {
   /// Returns the download id.
   Future<String> startDownload(DownloadRequest request) async {
     final reply = await _invokeMap('startDownload', request.toJson());
+    return reply['id'] as String;
+  }
+
+  /// Starts re-encoding a saved video to fit a size; returns its id. It
+  /// reports progress and finishes like a download, and `cancelDownload`
+  /// stops it.
+  Future<String> fitVideo(FitRequest request) async {
+    final reply = await _invokeMap('fitVideo', request.toJson());
     return reply['id'] as String;
   }
 

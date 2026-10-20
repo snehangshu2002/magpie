@@ -10,6 +10,8 @@ extension FailureMessage on Failure {
     CancelledFailure() => l10n.failureCancelled,
     NotFoundFailure() => l10n.failureNotFound,
     NoAppFailure() => l10n.failureNoApp,
+    TooLargeFailure() => l10n.failureTooLarge,
+    EncodeFailure() => l10n.failureEncode,
     UnavailableFailure() => l10n.failureUnavailable,
     UnknownFailure() => l10n.failureUnknown,
   };

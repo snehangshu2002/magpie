@@ -21,6 +21,8 @@ internal object EngineErrors {
     const val CANCELLED = "CANCELLED"
     const val NOT_FOUND = "NOT_FOUND"
     const val NO_APP = "NO_APP"
+    const val TOO_LARGE = "TOO_LARGE"
+    const val ENCODE = "ENCODE"
     const val UNKNOWN = "UNKNOWN"
 
     data class Error(val code: String, val message: String?)
@@ -42,6 +44,8 @@ internal object EngineErrors {
             e.message,
         )
         is StorageException -> Error(STORAGE, e.message)
+        is FitTooLargeException -> Error(TOO_LARGE, e.message)
+        is EncodeException -> Error(ENCODE, e.message)
         is FileNotFoundException -> Error(NOT_FOUND, e.message)
         is NoAppException -> Error(NO_APP, e.message)
         else -> Error(UNKNOWN, e.message)
