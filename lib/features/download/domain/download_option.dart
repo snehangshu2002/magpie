@@ -50,7 +50,7 @@ typedef PostItem = ({
 const postSelector = 'post';
 
 /// `startDownload` selector that saves `imageUrls`: full-size photos found
-/// outside yt-dlp (X, Reddit, links to an image).
+/// outside yt-dlp (X, links to an image).
 const photosSelector = 'images';
 
 /// Why [DownloadOptions.recommendedType] was picked; shown next to it.

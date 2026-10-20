@@ -20,7 +20,7 @@ const _audioExts = {'m4a', 'mp3', 'opus', 'ogg', 'oga', 'aac', 'flac', 'wav'};
 /// (one per video quality, one per audio container, images) and picks the
 /// one that fits the link best. A post with several items, or a photo post,
 /// gets a single option that saves all of it. [photos] are full-size photos
-/// found outside yt-dlp (X, Reddit, a link to an image): saved on their own
+/// found outside yt-dlp (X, a link to an image): saved on their own
 /// when yt-dlp found nothing else, else offered as the image choice next to
 /// its video. Returns null when nothing is downloadable.
 DownloadOptions? suggestDownloadOptions(

@@ -10,8 +10,8 @@ import 'package:media_downloader/features/download/domain/web_photo.dart';
 abstract interface class MediaRepository {
   Future<Result<MediaInfo>> fetchInfo(Uri url);
 
-  /// Full-size photos of [url] that yt-dlp leaves out: those of a post on X
-  /// or Reddit, or the image itself when the link is one. Null when there
+  /// Full-size photos of [url] that yt-dlp leaves out: those of a post on X,
+  /// or the image itself when the link is one. Null when there
   /// are none.
   Future<Result<WebPhotos?>> fetchPhotos(Uri url, SourcePlatform platform);
 

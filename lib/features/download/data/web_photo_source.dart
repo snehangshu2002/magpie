@@ -9,7 +9,7 @@ import 'package:media_downloader/features/download/domain/web_photo.dart';
 
 /// Finds full-size photos that yt-dlp doesn't save: photos in posts on X
 /// (its public syndication endpoint, which yt-dlp also falls back to) and
-/// Reddit (the post's public JSON), and links that are an image themselves.
+/// links that are an image themselves.
 ///
 /// Methods throw [IOException], [TimeoutException] or [FormatException];
 /// the repository turns them into failures.
@@ -27,7 +27,6 @@ class WebPhotoSource {
     if (isImageLink(url)) return await imageAt(url);
     return await switch (platform) {
       SourcePlatform.x => _tweetPhotos(url),
-      SourcePlatform.reddit => _redditPhotos(url),
       _ => Future.value(),
     };
   }
@@ -77,27 +76,6 @@ class WebPhotoSource {
       }),
     );
     return json is Map<String, dynamic> ? photosFromTweet(json) : null;
-  }
-
-  Future<WebPhotos?> _redditPhotos(Uri url) async {
-    var path = redditPostPath(url);
-    // Share links (`/r/<sub>/s/<code>`) redirect to the post.
-    if (path == null && url.pathSegments.contains('s')) {
-      final target = await _withClient((client) async {
-        final request = await client.openUrl('GET', url)
-          ..followRedirects = false
-          ..headers.set(HttpHeaders.userAgentHeader, _userAgent);
-        final response = await request.close().timeout(_timeout);
-        await response.drain<void>();
-        return response.headers.value(HttpHeaders.locationHeader);
-      });
-      if (target != null) path = redditPostPath(url.resolve(target));
-    }
-    if (path == null) return null;
-    final json = await _getJson(
-      Uri.https('www.reddit.com', '/$path/.json', {'raw_json': '1'}),
-    );
-    return photosFromRedditListing(json);
   }
 
   Future<Object?> _getJson(Uri url) => _withClient((client) async {
@@ -279,133 +257,4 @@ WebPhoto _tweetPhoto(Uri url, Object? info) {
       _ => null,
     },
   );
-}
-
-/// `comments/<id>` (with its `r/<sub>/` prefix, if any) of a Reddit post
-/// link, as yt-dlp's Reddit extractor reads it; null for other links.
-String? redditPostPath(Uri url) {
-  if (url.host == 'redd.it' && url.pathSegments.isNotEmpty) {
-    return 'comments/${url.pathSegments.first}';
-  }
-  final match = RegExp('^/((?:(?:r|user|u)/[^/]+/)?comments/[^/?#&]+)')
-      .firstMatch(url.path);
-  return match?.group(1);
-}
-
-/// The photos of a Reddit post from its `.json` listing: every image of a
-/// gallery, in order, or the post's single image; null for other posts.
-/// A crosspost uses the original post's photos.
-WebPhotos? photosFromRedditListing(Object? json) {
-  if (json case [
-    {'data': {'children': [{'data': final Map<String, dynamic> post}, ...]}},
-    ...,
-  ]) {
-    var photos = _redditPhotos(post);
-    if (photos.isEmpty) {
-      if (post case {
-        'crosspost_parent_list': [final Map<String, dynamic> p, ...],
-      }) {
-        photos = _redditPhotos(p);
-      }
-    }
-    if (photos.isEmpty) return null;
-    return WebPhotos(
-      photos: photos,
-      title: switch (post['title']) {
-        final String title => title,
-        _ => null,
-      },
-    );
-  }
-  return null;
-}
-
-List<WebPhoto> _redditPhotos(Map<String, dynamic> post) {
-  if (post case {
-    'gallery_data': {'items': final List<Object?> items},
-    'media_metadata': final Map<String, dynamic> media,
-  }) {
-    return [
-      for (final item in items)
-        if (item case {'media_id': final String id})
-          ?_galleryPhoto(id, media[id]),
-    ];
-  }
-  final link = switch (post['url_overridden_by_dest'] ?? post['url']) {
-    final String url => Uri.tryParse(url),
-    _ => null,
-  };
-  if (link == null || !isImageLink(link)) return const [];
-  final full = fullSizeImageUrl(link);
-  final (source, preview) = switch (post['preview']) {
-    {'images': [final Map<String, dynamic> image, ...]} => (
-      image['source'],
-      _redditPreview(image['resolutions'], 'url', 'width'),
-    ),
-    _ => (null, null),
-  };
-  return [
-    WebPhoto(
-      url: full.toString(),
-      preview: preview,
-      ext: imageExtOf(full.path),
-      width: switch (source) {
-        {'width': final int w} => w,
-        _ => null,
-      },
-      height: switch (source) {
-        {'height': final int h} => h,
-        _ => null,
-      },
-    ),
-  ];
-}
-
-/// The original of one gallery item: `i.redd.it/<id>.<ext>` for an image,
-/// the GIF for an animated one; null for anything else (videos, failed
-/// uploads).
-WebPhoto? _galleryPhoto(String id, Object? meta) {
-  if (meta is! Map<String, dynamic>) return null;
-  if (meta['status'] case final String status when status != 'valid') {
-    return null;
-  }
-  final preview = _redditPreview(meta['p'], 'u', 'x');
-  final (width, height) = switch (meta['s']) {
-    {'x': final int x, 'y': final int y} => (x, y),
-    _ => (null, null),
-  };
-  switch (meta) {
-    case {'e': 'Image', 'm': final String mime}:
-      final ext = _extOfMime(mime) ?? 'jpg';
-      return WebPhoto(
-        url: 'https://i.redd.it/$id.$ext',
-        preview: preview,
-        ext: ext,
-        width: width,
-        height: height,
-      );
-    case {'e': 'AnimatedImage', 's': {'gif': final String gif}}:
-      return WebPhoto(
-        url: gif,
-        preview: preview,
-        ext: 'gif',
-        width: width,
-        height: height,
-      );
-  }
-  return null;
-}
-
-/// A preview about 640 wide from Reddit's list of smaller copies (smallest
-/// first), for the picker; null when there are none.
-String? _redditPreview(Object? copies, String urlKey, String widthKey) {
-  if (copies is! List<Object?> || copies.isEmpty) return null;
-  String? best;
-  for (final copy in copies) {
-    if (copy is! Map<String, dynamic>) continue;
-    final (url, width) = (copy[urlKey], copy[widthKey]);
-    if (url is! String) continue;
-    if (best == null || (width is int && width <= 640)) best = url;
-  }
-  return best;
 }

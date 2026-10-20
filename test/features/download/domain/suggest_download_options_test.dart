@@ -413,7 +413,7 @@ void main() {
     test('picking some photos saves just those, numbered by place', () {
       final options = suggestDownloadOptions(
         empty,
-        platform: SourcePlatform.reddit,
+        platform: SourcePlatform.other,
         photos: photos,
       )!;
 
