@@ -13,6 +13,8 @@ class AppUpdate {
     required this.url,
     required this.pageUrl,
     this.size,
+    this.apkName,
+    this.sha256,
     this.notes = const [],
     this.published,
   });
@@ -28,6 +30,15 @@ class AppUpdate {
   /// Bytes of the APK at [url]; null when that is the release page.
   final int? size;
 
+  /// File name of the APK at [url]; null when that is the release page.
+  final String? apkName;
+
+  /// The APK's SHA-256 as GitHub lists it (hex), to check the download.
+  final String? sha256;
+
+  /// Whether the APK can be downloaded and installed from inside the app.
+  bool get installable => apkName != null;
+
   /// The bullet points of the release notes.
   final List<String> notes;
   final DateTime? published;
@@ -41,8 +52,21 @@ abstract interface class UpdateRepository {
   /// The installed app's version name (e.g. `1.1.0`).
   Future<Result<String>> installedVersion();
 
-  /// Opens [url] (an update's APK or release page) in the browser.
+  /// Opens [url] (a release page) in the browser.
   Future<Result<void>> open(String url);
+
+  /// Downloads [update]'s APK into the app's cache; returns its path.
+  /// [onProgress] gets bytes so far and the total, when known. Stops with
+  /// `Failure.cancelled` once [isCancelled] is true.
+  Future<Result<String>> download(
+    AppUpdate update, {
+    required void Function(int received, int? total) onProgress,
+    required bool Function() isCancelled,
+  });
+
+  /// Checks the APK at [path] against [AppUpdate.sha256] and opens Android's
+  /// installer for it.
+  Future<Result<void>> install(String path, AppUpdate update);
 }
 
 /// Whether release tag [latest] (`v1.2.0`) is newer than [current]
