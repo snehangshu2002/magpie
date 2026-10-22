@@ -97,7 +97,12 @@ class StorageBridge(
                 val uri = requireExisting(call.requireString("uri"))
                 launch(
                     Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(uri, call.argument<String>("mimeType"))
+                        // No type from Dart (a download just saved): some launchers
+                        // (HyperOS) won't look it up themselves, so ask MediaStore.
+                        .setDataAndType(
+                            uri,
+                            call.argument<String>("mimeType") ?: context.contentResolver.getType(uri),
+                        )
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
                 )
                 null
