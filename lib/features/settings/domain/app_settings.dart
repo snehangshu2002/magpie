@@ -16,6 +16,21 @@ enum AppFont {
   final String? family;
 }
 
+/// The app's colours: [sage] is the designed palette; the others grow a
+/// Material scheme from [seed] (ARGB).
+enum ThemeColor {
+  sage(null),
+  sea(0xFF3A6D8C),
+  pine(0xFF2F6B57),
+  lavender(0xFF6B5B95),
+  clay(0xFF9A5444),
+  sand(0xFF8A6D3B);
+
+  new(this.seed);
+
+  final int? seed;
+}
+
 /// What audio downloads are saved as; [original] keeps the site's file.
 enum AudioFormat { original, mp3, m4a, opus }
 
@@ -26,6 +41,7 @@ final class AppSettings {
     this.preferAudioForMusic = true,
     this.appearance = AppearanceMode.system,
     this.font = AppFont.system,
+    this.themeColor = ThemeColor.sage,
     this.saveFolder = defaultSaveFolder,
     this.audioFolder = '',
     this.wallpaperColors = false,
@@ -45,7 +61,6 @@ final class AppSettings {
     this.saveAsMkv = false,
     this.speedLimitKiB = 0,
     this.parallelPieces = false,
-    this.aria2 = false,
     this.proxy = '',
     this.forceIpv4 = false,
     this.userAgent = '',
@@ -82,6 +97,9 @@ final class AppSettings {
 
   final AppearanceMode appearance;
   final AppFont font;
+
+  /// Used unless [wallpaperColors] is on.
+  final ThemeColor themeColor;
 
   /// Folder under shared storage that downloads go into, e.g.
   /// `Download/Magpie`; each site gets a subfolder.
@@ -139,9 +157,6 @@ final class AppSettings {
   /// Download several parts of a video at once.
   final bool parallelPieces;
 
-  /// Use aria2 as the downloader.
-  final bool aria2;
-
   /// e.g. `socks5://127.0.0.1:1080`; empty for none.
   final String proxy;
   final bool forceIpv4;
@@ -164,6 +179,7 @@ final class AppSettings {
     bool? preferAudioForMusic,
     AppearanceMode? appearance,
     AppFont? font,
+    ThemeColor? themeColor,
     String? saveFolder,
     String? audioFolder,
     bool? wallpaperColors,
@@ -183,7 +199,6 @@ final class AppSettings {
     bool? saveAsMkv,
     int? speedLimitKiB,
     bool? parallelPieces,
-    bool? aria2,
     String? proxy,
     bool? forceIpv4,
     String? userAgent,
@@ -195,6 +210,7 @@ final class AppSettings {
     preferAudioForMusic: preferAudioForMusic ?? this.preferAudioForMusic,
     appearance: appearance ?? this.appearance,
     font: font ?? this.font,
+    themeColor: themeColor ?? this.themeColor,
     saveFolder: saveFolder ?? this.saveFolder,
     audioFolder: audioFolder ?? this.audioFolder,
     wallpaperColors: wallpaperColors ?? this.wallpaperColors,
@@ -214,7 +230,6 @@ final class AppSettings {
     saveAsMkv: saveAsMkv ?? this.saveAsMkv,
     speedLimitKiB: speedLimitKiB ?? this.speedLimitKiB,
     parallelPieces: parallelPieces ?? this.parallelPieces,
-    aria2: aria2 ?? this.aria2,
     proxy: proxy ?? this.proxy,
     forceIpv4: forceIpv4 ?? this.forceIpv4,
     userAgent: userAgent ?? this.userAgent,

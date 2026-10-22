@@ -80,9 +80,9 @@ flutter {
 dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
-    // aria2c as yt-dlp's downloader, when "Faster downloads" is on.
-    implementation("io.github.junkfood02.youtubedl-android:aria2c:0.18.1")
     // NotificationCompat/ServiceCompat for DownloadService; already pulled in by Flutter plugins.
     implementation("androidx.core:core:1.17.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    // JVM tests of the file handling in SavedFiles.kt.
+    testImplementation("junit:junit:4.13.2")
 }

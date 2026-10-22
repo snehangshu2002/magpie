@@ -12,7 +12,8 @@ abstract class DownloadRequest with _$DownloadRequest {
     required String id,
     required String url,
     required String formatId,
-    required OutputType outputType,
+    // For the Library's record only; the engine doesn't need it.
+    @JsonKey(includeToJson: false) required OutputType outputType,
 
     /// Relative path under shared storage, e.g. `Download/<AppName>/YouTube`.
     required String targetDir,

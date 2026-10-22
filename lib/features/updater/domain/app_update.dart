@@ -46,8 +46,9 @@ class AppUpdate {
 
 abstract interface class UpdateRepository {
   /// The latest GitHub release if it is newer than the installed app, else
-  /// null.
-  Future<Result<AppUpdate?>> check();
+  /// null. [options] are `networkArgs`: their proxy, `-4` and user agent
+  /// apply here too.
+  Future<Result<AppUpdate?>> check({List<String> options = const []});
 
   /// The installed app's version name (e.g. `1.1.0`).
   Future<Result<String>> installedVersion();
@@ -62,6 +63,7 @@ abstract interface class UpdateRepository {
     AppUpdate update, {
     required void Function(int received, int? total) onProgress,
     required bool Function() isCancelled,
+    List<String> options = const [],
   });
 
   /// Checks the APK at [path] against [AppUpdate.sha256] and opens Android's

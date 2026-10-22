@@ -106,12 +106,16 @@ void main() {
   });
 
   test('posts and photos take no media processing', () {
-    const s = AppSettings(embedMetadata: true, skipSponsors: true, aria2: true);
+    const s = AppSettings(
+      embedMetadata: true,
+      skipSponsors: true,
+      simpleFileNames: true,
+    );
     const post = DownloadOption(
       type: OutputType.video,
       formatSelector: postSelector,
     );
-    expect(downloadArgs(s, post), ['--downloader', 'libaria2c.so']);
+    expect(downloadArgs(s, post), ['--restrict-filenames']);
   });
 
   test('MKV changes the extension of merged videos', () {

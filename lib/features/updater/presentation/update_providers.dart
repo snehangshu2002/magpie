@@ -1,5 +1,7 @@
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/utils/result.dart';
+import 'package:media_downloader/features/download/domain/download_args.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
 import 'package:media_downloader/features/updater/domain/app_update.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -9,8 +11,13 @@ part 'update_providers.g.dart';
 /// A newer release of the app, checked once per launch; null when up to
 /// date. Failures are not shown: the next launch checks again.
 @Riverpod(keepAlive: true)
-Future<AppUpdate?> appUpdate(Ref ref) async =>
-    (await ref.watch(updateRepositoryProvider).check()).getOrThrow();
+Future<AppUpdate?> appUpdate(Ref ref) async {
+  final settings = await ref.read(settingsProvider.future);
+  return (await ref
+          .watch(updateRepositoryProvider)
+          .check(options: networkArgs(settings)))
+      .getOrThrow();
+}
 
 /// The installed app's version, shown in Settings.
 @Riverpod(keepAlive: true)
@@ -70,6 +77,8 @@ class UpdateDownload extends _$UpdateDownload {
     _cancelled = false;
     state = const UpdateDownloading(0, null);
     final repository = ref.read(updateRepositoryProvider);
+    final settings = await ref.read(settingsProvider.future);
+    if (!ref.mounted || _cancelled) return;
     final downloaded = await repository.download(
       update,
       onProgress: (received, total) {
@@ -78,6 +87,7 @@ class UpdateDownload extends _$UpdateDownload {
         }
       },
       isCancelled: () => _cancelled,
+      options: networkArgs(settings),
     );
     if (!ref.mounted || _cancelled) return;
     switch (downloaded) {

@@ -51,7 +51,7 @@ class _FakeUpdateRepository implements UpdateRepository {
   int checks = 0;
 
   @override
-  Future<Result<AppUpdate?>> check() async {
+  Future<Result<AppUpdate?>> check({List<String> options = const []}) async {
     checks++;
     return Ok(update);
   }
@@ -75,6 +75,7 @@ class _FakeUpdateRepository implements UpdateRepository {
     AppUpdate update, {
     required void Function(int received, int? total) onProgress,
     required bool Function() isCancelled,
+    List<String> options = const [],
   }) async {
     onProgress(8000000, update.size);
     await downloadDone.future;
@@ -257,6 +258,11 @@ void main() {
     await tester.tap(find.text('Check'));
     await tester.pumpAndSettle();
     expect(updates.checks, 2);
+    // The row reads the same afterwards, so the result is said out loud.
+    expect(
+      find.text("No update available. You're on the latest version"),
+      findsOneWidget,
+    );
   });
 
   testWidgets('after Later, settings offers the update again', (tester) async {
@@ -407,6 +413,49 @@ void main() {
     expect(settings.settings.font, AppFont.serif);
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.textTheme.bodyMedium?.fontFamily, 'SourceSerif4');
+  });
+
+  testWidgets('colour is picked from the swatches and applied', (tester) async {
+    final settings = FakeSettingsRepository();
+    await pumpApp(tester, settings: settings);
+    await openSettings(tester);
+
+    final sea = find.bySemanticsLabel('Sea');
+    await tester.ensureVisible(sea);
+    await tester.tap(sea);
+    await tester.pumpAndSettle();
+
+    expect(settings.settings.themeColor, ThemeColor.sea);
+    // Each swatch shows its palette: a top half and two bottom quarters.
+    final blocks = find.descendant(of: sea, matching: find.byType(ColoredBox));
+    expect(
+      [
+        for (final e in blocks.evaluate())
+          tester.getSize(find.byWidget(e.widget)),
+      ],
+      const [Size(40, 20), Size(20, 20), Size(20, 20)],
+    );
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(
+      app.theme?.colorScheme.primary,
+      ColorScheme.fromSeed(seedColor: Color(ThemeColor.sea.seed!)).primary,
+    );
+  });
+
+  testWidgets('wallpaper colours lock the swatches', (tester) async {
+    final settings = FakeSettingsRepository(
+      const AppSettings(wallpaperColors: true),
+    );
+    await pumpApp(tester, settings: settings);
+    await openSettings(tester);
+
+    expect(find.text('Taken from your wallpaper'), findsOneWidget);
+    final sea = find.bySemanticsLabel('Sea');
+    await tester.ensureVisible(sea);
+    await tester.tap(sea, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(settings.settings.themeColor, ThemeColor.sage);
   });
 
   testWidgets('a folder inside Download becomes the save location', (

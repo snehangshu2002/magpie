@@ -61,8 +61,6 @@ List<String> downloadArgs(
     ...networkArgs(s),
     if (s.speedLimitKiB > 0) ...['-r', '${s.speedLimitKiB}K'],
     if (s.parallelPieces) ...['-N', '4'],
-    // youtubedl-android finds aria2c by its library file name.
-    if (s.aria2) ...['--downloader', 'libaria2c.so'],
     if (s.simpleFileNames) '--restrict-filenames',
     if (media) ...[
       if (option.playlist &&

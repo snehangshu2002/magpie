@@ -23,6 +23,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   static const _preferAudio = 'preferAudioForMusic';
   static const _appearance = 'appearance';
   static const _font = 'font';
+  static const _themeColor = 'themeColor';
   static const _saveFolder = 'saveFolder';
   static const _audioFolder = 'audioFolder';
   static const _audioFormat = 'audioFormat';
@@ -108,7 +109,6 @@ class SettingsRepositoryImpl implements SettingsRepository {
           (s) => s.parallelPieces,
           (s, v) => s.copyWith(parallelPieces: v),
         ),
-        'aria2': ((s) => s.aria2, (s, v) => s.copyWith(aria2: v)),
         'forceIpv4': ((s) => s.forceIpv4, (s, v) => s.copyWith(forceIpv4: v)),
         'simpleFileNames': (
           (s) => s.simpleFileNames,
@@ -126,6 +126,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
           _preferAudio,
           _appearance,
           _font,
+          _themeColor,
           _saveFolder,
           _audioFolder,
           _audioFormat,
@@ -146,6 +147,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
             AppearanceMode.values.asNameMap()[values[_appearance]] ??
             defaults.appearance,
         font: AppFont.values.asNameMap()[values[_font]] ?? defaults.font,
+        themeColor:
+            ThemeColor.values.asNameMap()[values[_themeColor]] ??
+            defaults.themeColor,
         saveFolder: switch (values[_saveFolder]) {
           final String folder when isSaveFolder(folder) => folder,
           _ => defaults.saveFolder,
@@ -189,6 +193,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       await _prefs.setBool(_preferAudio, settings.preferAudioForMusic);
       await _prefs.setString(_appearance, settings.appearance.name);
       await _prefs.setString(_font, settings.font.name);
+      await _prefs.setString(_themeColor, settings.themeColor.name);
       await _prefs.setString(_saveFolder, settings.saveFolder);
       await _prefs.setString(_audioFolder, settings.audioFolder);
       await _prefs.setString(_audioFormat, settings.audioFormat.name);

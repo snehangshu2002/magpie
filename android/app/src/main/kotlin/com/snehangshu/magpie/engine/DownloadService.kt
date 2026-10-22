@@ -36,7 +36,6 @@ data class DownloadRequest(
     val id: String,
     val url: String,
     val formatId: String,
-    val outputType: String,
     val targetDir: String,
     val title: String?,
     /**
@@ -197,12 +196,15 @@ class DownloadService : Service() {
             publish(task, force = true)
 
             val uris = files.map { MediaStoreSaver.save(this, it, task.request.targetDir).toString() }
+            keepArchive(task)
             task.filePath = uris.first()
             task.filePaths = uris.takeIf { it.size > 1 }
             task.mimeType = MediaStoreSaver.mimeTypeOf(files.first())
             task.state = STATE_SAVED
         } finally {
             workDir.deleteRecursively()
+            archiveCopy(task).delete()
+            cookiesCopy(task).delete()
         }
     }
 
@@ -234,9 +236,8 @@ class DownloadService : Service() {
             }
             publish(task)
         }
-        return workDir.listFiles()
-            ?.filter { it.isFile && it.extension !in TEMP_EXTENSIONS }
-            ?.maxByOrNull { it.length() }
+        return finishedFiles(workDir)
+            .maxByOrNull { it.length() }
             ?: if (task.request.archive) {
                 // yt-dlp skips a video in the archive without an error.
                 throw NothingNewException()
@@ -292,35 +293,12 @@ class DownloadService : Service() {
             if (unexpected) throw e
         }
 
-        val files = workDir.listFiles()
-            ?.filter { it.isFile && it.extension !in TEMP_EXTENSIONS }
-            .orEmpty()
-        val saved = files.groupBy { it.name.substringBefore('.') }
-            .toSortedMap(compareBy { it.substringBefore(' ').toIntOrNull() ?: 0 })
-            // A video's thumbnail is written too; keep only the video.
-            .map { (_, group) ->
-                group.firstOrNull { MediaStoreSaver.mimeTypeOf(it).startsWith("video/") }
-                    ?: group.maxBy { it.length() }
-            }
-        if (saved.isEmpty()) throw YoutubeDLException("yt-dlp finished without producing a file")
-
         val title = task.request.title?.let(::safeFileName)?.takeIf { it.isNotBlank() }
-        val picked = task.request.items?.sorted()
-        return saved.mapIndexed { i, file ->
-            // Instagram's photos are JPEGs whose URL ends in ".heic".
-            val ext = MediaStoreSaver.imageExtensionOf(file) ?: file.extension
-            val base = title ?: file.name.substringBefore('.').substringAfter(' ')
-            // Picked items keep their place in the post, so items saved in
-            // separate runs don't all share the post's name. If one produced
-            // nothing, yt-dlp's playlist_index prefix still gives the place.
-            val number = when {
-                picked == null -> (i + 1).takeIf { saved.size > 1 }
-                saved.size == picked.size -> picked[i]
-                else -> file.name.substringBefore(' ').toIntOrNull()
-            }
-            val name = if (number != null) "$base $number.$ext" else "$base.$ext"
-            File(workDir, name).also { file.renameTo(it) }
+        val saved = postFiles(workDir, title, task.request.items) {
+            MediaStoreSaver.mimeTypeOf(it).startsWith("video/")
         }
+        if (saved.isEmpty()) throw YoutubeDLException("yt-dlp finished without producing a file")
+        return saved
     }
 
     /**
@@ -365,46 +343,55 @@ class DownloadService : Service() {
             if (finishedFiles(workDir).isEmpty()) throw e
         }
 
-        val files = finishedFiles(workDir)
-            .groupBy { it.name.substringBefore(' ').toIntOrNull() ?: 0 }
-            .toSortedMap()
-            // A stream left unmerged next to its merged file: keep the biggest.
-            .map { (_, group) -> group.maxBy { it.length() } }
+        val files = playlistFiles(workDir)
         if (files.isEmpty()) {
             if (task.request.archive) throw NothingNewException()
             throw YoutubeDLException("yt-dlp finished without producing a file")
         }
-        return files.map { file ->
-            val target = File(workDir, file.name.substringAfter(' '))
-            // Two items with the same title keep their numbers.
-            if (target.exists() || !file.renameTo(target)) file else target
-        }
+        return files
     }
-
-    private fun finishedFiles(workDir: File): List<File> =
-        workDir.listFiles()?.filter { it.isFile && it.extension !in TEMP_EXTENSIONS }.orEmpty()
 
     /** The output template for [task]'s file names, without the extension. */
     private fun nameTemplate(task: DownloadTask) =
         task.request.fileName?.takeIf { it.isNotBlank() && '/' !in it } ?: "%(title).150B"
 
-    /** Records saved videos, and skips those recorded before, when asked. */
+    /**
+     * Skips videos saved before, when asked. yt-dlp records a video as soon
+     * as it has the file, before it is saved, so it gets a copy of the
+     * archive; [keepArchive] adds the new lines once the files are saved.
+     */
     private fun YoutubeDLRequest.addArchive(task: DownloadTask) {
-        if (task.request.archive) {
-            addOption("--download-archive", File(noBackupFilesDir, "archive.txt").absolutePath)
+        if (!task.request.archive) return
+        val copy = archiveCopy(task)
+        synchronized(ARCHIVE_LOCK) {
+            if (archiveFile().exists()) archiveFile().copyTo(copy, overwrite = true) else copy.delete()
+        }
+        addOption("--download-archive", copy.absolutePath)
+    }
+
+    /** Adds the videos [task] saved to the shared archive. */
+    private fun keepArchive(task: DownloadTask) {
+        val copy = archiveCopy(task)
+        if (!task.request.archive || !copy.exists()) return
+        synchronized(ARCHIVE_LOCK) {
+            val archive = archiveFile()
+            val known = if (archive.exists()) archive.readLines().toSet() else emptySet()
+            val added = copy.readLines().filter { it.isNotBlank() && it !in known }
+            if (added.isNotEmpty()) archive.appendText(added.joinToString("\n", postfix = "\n"))
         }
     }
+
+    private fun archiveFile() = File(noBackupFilesDir, "archive.txt")
+
+    // Next to the job's work dir, not in it: that dir is read for the downloaded files.
+    private fun archiveCopy(task: DownloadTask) = File(workRoot(), "${task.id}.archive.txt")
+
+    private fun cookiesCopy(task: DownloadTask) = File(workRoot(), "${task.id}.cookies.txt")
 
     /** Settings-driven arguments from Dart, and the user's sign-ins. */
     private fun YoutubeDLRequest.applyUserOptions(task: DownloadTask) {
         if (task.request.options.isNotEmpty()) addCommands(task.request.options)
-        if (ARIA2C in task.request.options) {
-            // The bundled aria2c doesn't know Android's certificates; without
-            // Python's bundle every HTTPS download fails its TLS handshake.
-            val certs = File(noBackupFilesDir, "youtubedl-android/packages/python/usr/etc/tls/cert.pem")
-            addOption("--downloader-args", "aria2c:--ca-certificate=${certs.absolutePath}")
-        }
-        Cookies.apply(this@DownloadService, this)
+        Cookies.apply(this@DownloadService, this, cookiesCopy(task))
     }
 
     /**
@@ -511,7 +498,6 @@ class DownloadService : Service() {
         id = getStringExtra(EXTRA_ID) ?: return null,
         url = getStringExtra(EXTRA_URL) ?: return null,
         formatId = getStringExtra(EXTRA_FORMAT_ID) ?: return null,
-        outputType = getStringExtra(EXTRA_OUTPUT_TYPE) ?: return null,
         targetDir = getStringExtra(EXTRA_TARGET_DIR) ?: return null,
         title = getStringExtra(EXTRA_TITLE),
         items = getIntArrayExtra(EXTRA_ITEMS)?.toList()?.takeIf { it.isNotEmpty() },
@@ -546,7 +532,6 @@ class DownloadService : Service() {
         internal const val EXTRA_ID = "id"
         private const val EXTRA_URL = "url"
         private const val EXTRA_FORMAT_ID = "formatId"
-        private const val EXTRA_OUTPUT_TYPE = "outputType"
         private const val EXTRA_TARGET_DIR = "targetDir"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_ITEMS = "items"
@@ -564,11 +549,9 @@ class DownloadService : Service() {
 
         private const val TAG = "DownloadService"
 
-        /** `--downloader` value Dart sends for "Use aria2". */
-        private const val ARIA2C = "libaria2c.so"
+        private val ARCHIVE_LOCK = Any()
         private const val MAX_PARALLEL = 2
         private const val EVENT_INTERVAL_MS = 250L
-        private val TEMP_EXTENSIONS = setOf("part", "ytdl", "temp")
 
         /** `startDownload` selector for every item of the link (see CLAUDE.md). */
         private const val FORMAT_POST = "post"
@@ -603,7 +586,6 @@ class DownloadService : Service() {
                 .putExtra(EXTRA_ID, request.id)
                 .putExtra(EXTRA_URL, request.url)
                 .putExtra(EXTRA_FORMAT_ID, request.formatId)
-                .putExtra(EXTRA_OUTPUT_TYPE, request.outputType)
                 .putExtra(EXTRA_TARGET_DIR, request.targetDir)
                 .putExtra(EXTRA_TITLE, request.title)
                 .putExtra(EXTRA_ITEMS, request.items?.toIntArray())

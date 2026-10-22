@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/errors/platform_failure.dart';
 import 'package:media_downloader/core/platform/updater_channel.dart';
+import 'package:media_downloader/core/utils/network_options.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/updater/domain/app_update.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -21,12 +22,13 @@ class UpdateRepositoryImpl implements UpdateRepository {
   final UpdaterChannel _channel;
 
   @override
-  Future<Result<AppUpdate?>> check() async {
+  Future<Result<AppUpdate?>> check({List<String> options = const []}) async {
     final info = await guardPlatformCall(_channel.appInfo);
     if (info case Err(:final failure)) return Err(failure);
     final app = info.getOrThrow();
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
+    applyNetworkOptions(client, options);
     try {
       final request = await client.getUrl(latestRelease);
       request.headers.set(
@@ -98,6 +100,7 @@ class UpdateRepositoryImpl implements UpdateRepository {
     AppUpdate update, {
     required void Function(int received, int? total) onProgress,
     required bool Function() isCancelled,
+    List<String> options = const [],
   }) async {
     final name = update.apkName;
     if (name == null) return const Err(Failure.notFound());
@@ -106,6 +109,7 @@ class UpdateRepositoryImpl implements UpdateRepository {
     final file = File(path.getOrThrow());
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
+    applyNetworkOptions(client, options);
     IOSink? sink;
     try {
       // GitHub redirects the asset to its storage host; HttpClient follows.

@@ -45,13 +45,19 @@ No account. No ads. No tracking.
 <p align="center">
   <img src="docs/screenshots/transcript.png" alt="Transcript sheet: choose a language, then copy the text or save it as a text file" width="250">
   &nbsp;
-  <img src="docs/screenshots/settings.png" alt="Settings: video quality, save location, automatic updates and the privacy note" width="250">
+  <img src="docs/screenshots/settings.png" alt="Appearance settings: theme, font, six colour palettes, wallpaper colours and a pure black dark theme" width="250">
+  &nbsp;
+  <img src="docs/screenshots/advanced.png" alt="Advanced settings: speed limit, download in pieces, proxy, IPv4 only, browser identity, file names and extra download options" width="250">
 </p>
 <p align="center"><sub>Photos and video shown: NASA (public domain).</sub></p>
 
 ## Features
 
+### Downloading
+
 - **Share or paste**: send a link from any app's share sheet, or paste it in.
+  Turn on **Download right away** to start the suggested download as soon as
+  a link is read.
 - **Pick what you want**: video in the quality you choose, audio only, or
   photos. From a post with several photos or videos, save all of them or
   just the ones you pick.
@@ -59,25 +65,61 @@ No account. No ads. No tracking.
   site offers, even above 4K. Photos from X posts are saved at the largest
   size the site serves, and a direct link to an image saves the full-size
   file.
+- **Playlists**: save a whole playlist, or choose which videos to keep.
+  Videos you already have can be skipped.
+- **Save only a part**: pick where a video starts and ends, and save just
+  that clip.
+- **Sign in to sites**: sign in to YouTube, Instagram, X, Reddit or Facebook
+  to download what your own account can see, such as age-restricted videos.
+  The sign-in stays on your phone.
+- **Downloads that keep going**: downloads run in the background with a
+  progress notification, so you can leave the app. Magpie can ask before
+  using mobile data.
+
+### Saved files
+
+- **Music your way**: keep the original audio or convert it to MP3, M4A or
+  Opus, with the video's thumbnail as cover art (square if you like).
+- **Title and artist**: the title, channel and date are saved inside the
+  file, where music and video players can read them.
+- **Subtitles**: put subtitles in your language into saved videos, or the
+  site's automatic captions when there are none.
+- **Skip sponsors**: cut sponsored segments out of YouTube videos, using
+  [SponsorBlock](https://sponsor.ajay.app).
+- **Fit for sharing**: make a smaller copy of a saved video, sized to send
+  in a chat app.
+- **Tidy folders**: files are saved to `Download/Magpie/<Site>/`, or to a
+  folder of your choice inside `Download`, with a separate folder for music
+  if you want one.
+
+### Reading
+
 - **Descriptions and captions**: read a video's description, or the caption
   or text of an Instagram, Facebook or X post, and copy it in one tap.
 - **YouTube transcripts**: read a video's transcript in any of its caption
   languages, copy it, or save it as a text file next to your downloads.
-- **Fit for sharing**: make a smaller copy of a saved video, sized to send
-  in a chat app.
-- **Downloads that keep going**: downloads run in the background with a
-  progress notification, so you can leave the app.
-- **Tidy folders**: files are saved to `Download/Magpie/<Site>/`, or to a
-  folder of your choice inside `Download`.
+
+### Library and app
+
 - **Library**: search and filter everything you've saved; open, share or
-  delete one file or many at once.
+  delete one file or many at once. Turn off **Keep a history** to save
+  files without a record in the app.
 - **Keeps working**: the download engine updates itself, so sites keep
   working as they change.
 - **Update notifications**: Magpie tells you when a new version is out and
   fetches the right APK for your phone.
-- **Your look**: light, dark or system theme, and a choice of fonts.
+- **Your look**: light, dark or system theme, six colour palettes or the
+  colours of your wallpaper (Android 12 and newer), a pure black dark
+  theme, and a choice of fonts.
 - **Private**: no account, no ads, no tracking; Settings shows what stays on
   your phone and what Magpie connects to.
+
+### Advanced
+
+For people who want more control, **Settings → Advanced** has a speed limit,
+downloading in pieces, a proxy (HTTP or SOCKS), IPv4
+only, a custom browser identity, file name templates, plain file names and
+extra [yt-dlp](https://github.com/yt-dlp/yt-dlp) options.
 
 ## Install
 
@@ -116,8 +158,11 @@ built and signed automatically from this repository by
 [GitHub Actions](.github/workflows/release.yml).
 
 **Can it download private or paid content?**
-No. Magpie only saves what you can already view without logging in, and it
-never bypasses DRM, paywalls or private accounts.
+Only what your own account can already see. Without signing in, Magpie
+saves what anyone can view; if you sign in to a site under
+**Settings → Accounts**, it can also save what that account can view, such
+as age-restricted videos. It never bypasses DRM, paywalls or private
+accounts you don't have access to.
 
 **Android says the app can't be installed.**
 If you installed a copy you built yourself, uninstall it first. Releases are
@@ -125,16 +170,22 @@ signed with a different key, and Android won't install one over the other.
 
 ## Privacy
 
-Magpie has no accounts, analytics or ads, and it collects nothing about you.
-It only connects to:
+Magpie has no accounts of its own, analytics or ads, and it collects
+nothing about you. It only connects to:
 
 - the sites whose links you give it, to download them;
 - GitHub, to update its download engine and to check for new versions of
-  the app.
+  the app;
+- [SponsorBlock](https://sponsor.ajay.app), only if you turn on
+  **Skip sponsor segments**, to find the sponsored parts of a YouTube video;
+- your proxy, if you set one under **Settings → Advanced**.
 
 Your files stay on your phone. Magpie never asks for access to all your
-files; it saves through Android's own media storage. The app says the same
-under **Settings → About → Your privacy**.
+files; it saves through Android's own media storage. If you sign in to a
+site, that sign-in is kept only on your phone, is not backed up, and is
+sent only to that site. You can sign out under **Settings → Accounts**.
+The app has a short version of this under
+**Settings → About → Your privacy**.
 
 ## Built with
 
@@ -212,6 +263,8 @@ Magpie stands on the work of these projects:
   [youtubedl-android](https://github.com/yausername/youtubedl-android), which
   do the downloading
 - [FFmpeg](https://ffmpeg.org), for merging and converting streams
+- [SponsorBlock](https://sponsor.ajay.app), whose community data marks
+  sponsored segments
 - [Simple Icons](https://simpleicons.org), for site logos
 - [Inter](https://rsms.me/inter/) and
   [Source Serif 4](https://github.com/adobe-fonts/source-serif), the app's

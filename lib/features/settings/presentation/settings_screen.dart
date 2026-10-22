@@ -7,6 +7,7 @@ import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/errors/failure_message.dart';
 import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/theme/app_theme.dart';
+import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/page_header.dart';
@@ -42,6 +43,17 @@ extension AppFontLabel on AppFont {
     AppFont.system => l10n.fontSystemHint,
     AppFont.sans => l10n.fontSansHint,
     AppFont.serif => l10n.fontSerifHint,
+  };
+}
+
+extension ThemeColorLabel on ThemeColor {
+  String label(AppLocalizations l10n) => switch (this) {
+    ThemeColor.sage => l10n.colorSage,
+    ThemeColor.sea => l10n.colorSea,
+    ThemeColor.pine => l10n.colorPine,
+    ThemeColor.lavender => l10n.colorLavender,
+    ThemeColor.clay => l10n.colorClay,
+    ThemeColor.sand => l10n.colorSand,
   };
 }
 
@@ -123,6 +135,19 @@ class SettingsScreen extends ConsumerWidget {
                             (s) => s.copyWith(font: font),
                           );
                         }
+                      },
+                    ),
+                    _ColorTile(
+                      selected: settings.themeColor,
+                      // The wallpaper's colours win while they're on.
+                      enabled: !settings.wallpaperColors,
+                      onPick: (color) {
+                        unawaited(HapticFeedback.selectionClick());
+                        unawaited(
+                          controller.change(
+                            (s) => s.copyWith(themeColor: color),
+                          ),
+                        );
                       },
                     ),
                     _switch(
@@ -371,13 +396,6 @@ class SettingsScreen extends ConsumerWidget {
                       subtitle: l10n.settingsParallelHint,
                       value: settings.parallelPieces,
                       update: (s, v) => s.copyWith(parallelPieces: v),
-                    ),
-                    _switch(
-                      controller,
-                      title: l10n.settingsAria2,
-                      subtitle: l10n.settingsAria2Hint,
-                      value: settings.aria2,
-                      update: (s, v) => s.copyWith(aria2: v),
                     ),
                     _textTile(
                       context,
@@ -697,17 +715,19 @@ class _AutoUpdateTile extends ConsumerWidget {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
     final update = ref.watch(engineAutoUpdateProvider);
+    // A retry keeps the last result (AsyncError) while it runs.
+    final loading = update.isLoading;
 
     return _SettingTile(
       icon: Icons.autorenew_rounded,
       title: l10n.settingsAutoUpdate,
       subtitle: switch (update) {
-        AsyncLoading() => l10n.settingsAutoUpdateChecking,
+        _ when loading => l10n.settingsAutoUpdateChecking,
         AsyncError() => l10n.settingsAutoUpdateFailed,
         _ => l10n.settingsAutoUpdateDone,
       },
       trailing: switch (update) {
-        AsyncLoading() => SizedBox.square(
+        _ when loading => SizedBox.square(
           dimension: 20,
           child: CircularProgressIndicator(
             strokeWidth: 2,
@@ -748,17 +768,30 @@ class _AppUpdateTile extends ConsumerWidget {
       foregroundColor: scheme.onPrimaryContainer,
     );
 
-    // A newer release found here shows the update sheet (AppShell listens).
-    void checkAgain() {
+    // A check keeps the last result (AsyncData) while it runs.
+    final loading = check.isLoading;
+
+    // A newer release found here shows the update sheet (AppShell listens);
+    // otherwise say so, since the row reads the same before and after.
+    Future<void> checkAgain() async {
       unawaited(HapticFeedback.lightImpact());
+      final messenger = ScaffoldMessenger.of(context);
       ref.invalidate(appUpdateProvider);
+      try {
+        if (await ref.read(appUpdateProvider.future) != null) return;
+      } on Failure {
+        return; // The row offers Retry.
+      }
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(l10n.settingsAppUpdateNone)));
     }
 
     return _SettingTile(
       icon: Icons.system_update_rounded,
       title: l10n.settingsAppUpdate,
       subtitle: switch (check) {
-        AsyncLoading() => l10n.settingsAppUpdateChecking,
+        _ when loading => l10n.settingsAppUpdateChecking,
         AsyncData(value: final update?) => l10n.settingsAppUpdateAvailable(
           update.version,
         ),
@@ -768,9 +801,9 @@ class _AppUpdateTile extends ConsumerWidget {
               ? l10n.settingsAppUpdateLatest
               : l10n.settingsAppUpdateCurrent(version),
       },
-      onTap: check is AsyncLoading ? null : checkAgain,
+      onTap: loading ? null : checkAgain,
       trailing: switch (check) {
-        AsyncLoading() => SizedBox.square(
+        _ when loading => SizedBox.square(
           dimension: 20,
           child: CircularProgressIndicator(
             strokeWidth: 2,
@@ -826,6 +859,167 @@ class _VersionTile extends ConsumerWidget {
 }
 
 /// Rounded card holding related settings, divided by hairlines.
+/// The app's palettes as swatches, each drawn in its own colours.
+class _ColorTile extends StatelessWidget {
+  const new({
+    required this.selected,
+    required this.enabled,
+    required this.onPick,
+  });
+
+  final ThemeColor selected;
+  final bool enabled;
+  final ValueChanged<ThemeColor> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = context.l10n;
+    final scheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.settingsColor,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            enabled ? selected.label(l10n) : l10n.settingsColorWallpaper,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          AnimatedOpacity(
+            opacity: enabled ? 1 : 0.4,
+            duration: AppMotion.durationOf(context),
+            curve: AppMotion.standard,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              child: Row(
+                children: [
+                  for (final color in ThemeColor.values)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _Swatch(
+                        color: color,
+                        selected: color == selected,
+                        onTap: enabled ? () => onPick(color) : null,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Swatch extends StatelessWidget {
+  const new({required this.color, required this.selected, this.onTap});
+
+  final ThemeColor color;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final seed = color.seed;
+    final palette = AppTheme.scheme(
+      theme.brightness,
+      seed: seed == null ? null : Color(seed),
+    );
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: color.label(context.l10n),
+      child: Material(
+        color: theme.colorScheme.surfaceContainerHighest,
+        shape: AppTheme.shape(16).copyWith(
+          side: BorderSide(
+            color: selected ? palette.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox.square(
+            dimension: 64,
+            child: Center(
+              child: SizedBox.square(
+                dimension: 40,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Primary over secondary and tertiary, like the
+                    // palette it stands for.
+                    ClipOval(
+                      // Stretched: a ColoredBox has no size of its own.
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: ColoredBox(color: palette.primary)),
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: ColoredBox(
+                                    color: palette.secondaryContainer,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: ColoredBox(color: palette.tertiary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Center(
+                      child: AnimatedScale(
+                        scale: selected ? 1 : 0,
+                        duration: AppMotion.durationOf(context),
+                        curve: AppMotion.standard,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: palette.primary,
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 16,
+                            color: palette.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Group extends StatelessWidget {
   const new({required this.children});
 

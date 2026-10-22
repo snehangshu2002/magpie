@@ -5,9 +5,19 @@ abstract final class AppTheme {
   static const _seed = Color(0xFF56664F);
 
   /// [fontFamily] is a family from pubspec.yaml; null keeps the phone's font.
-  /// [wallpaper] replaces the sage palette with the phone's own colours.
-  static ThemeData light({String? fontFamily, ColorScheme? wallpaper}) =>
-      _build(wallpaper ?? _lightScheme, fontFamily);
+  /// [wallpaper] replaces the sage palette with the phone's own colours;
+  /// otherwise [seed], when set, grows another palette in its place.
+  static ThemeData light({
+    String? fontFamily,
+    ColorScheme? wallpaper,
+    Color? seed,
+  }) => _build(wallpaper ?? scheme(Brightness.light, seed: seed), fontFamily);
+
+  /// The palette for [brightness]: sage, or one grown from [seed].
+  static ColorScheme scheme(Brightness brightness, {Color? seed}) =>
+      seed == null
+      ? (brightness == Brightness.light ? _lightScheme : _darkScheme)
+      : ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
 
   static final ColorScheme _lightScheme =
       ColorScheme.fromSeed(
@@ -53,9 +63,10 @@ abstract final class AppTheme {
   static ThemeData dark({
     String? fontFamily,
     ColorScheme? wallpaper,
+    Color? seed,
     bool pureBlack = false,
   }) {
-    final scheme = wallpaper ?? _darkScheme;
+    final scheme = wallpaper ?? AppTheme.scheme(Brightness.dark, seed: seed);
     return _build(
       pureBlack
           ? scheme.copyWith(

@@ -8,8 +8,8 @@ import java.io.File
 
 /**
  * Sign-ins the user made in [SignInActivity], kept as a Netscape cookie file
- * that yt-dlp reads (and updates) with `--cookies`. yt-dlp only sends a
- * site its own cookies, so the file is passed on every run.
+ * that yt-dlp reads with `--cookies`. yt-dlp only sends a site its own
+ * cookies, so the file is passed on every run.
  */
 internal object Cookies {
     private const val HEADER = "# Netscape HTTP Cookie File"
@@ -21,10 +21,19 @@ internal object Cookies {
 
     private fun file(context: Context) = File(context.noBackupFilesDir, "cookies.txt")
 
-    /** Adds `--cookies` when the user signed in to any site. */
-    fun apply(context: Context, request: YoutubeDLRequest) {
-        val file = file(context)
-        if (file.exists()) request.addOption("--cookies", file.absolutePath)
+    /**
+     * Adds `--cookies` when the user signed in to any site, as a copy at
+     * [copy] for the caller to delete after the run: yt-dlp writes its
+     * cookies back when it ends, which would undo a sign-in or sign-out made
+     * meanwhile, and two runs could write the file at once.
+     */
+    fun apply(context: Context, request: YoutubeDLRequest, copy: File) {
+        synchronized(lock) {
+            val file = file(context)
+            if (!file.exists()) return
+            file.copyTo(copy, overwrite = true)
+        }
+        request.addOption("--cookies", copy.absolutePath)
     }
 
     /** Sites with saved cookies, e.g. `instagram.com`. */

@@ -12,6 +12,7 @@ import com.snehangshu.magpie.storage.StorageException
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
+import com.yausername.youtubedl_android.YoutubeDLResponse
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -98,7 +99,6 @@ class YtDlpBridge(
                     id = call.requireString("id"),
                     url = call.requireString("url"),
                     formatId = call.requireString("formatId"),
-                    outputType = call.requireString("outputType"),
                     targetDir = call.requireString("targetDir"),
                     title = call.argument<String>("title"),
                     items = call.argument<List<Int>>("items"),
@@ -118,7 +118,6 @@ class YtDlpBridge(
                     id = call.requireString("id"),
                     url = call.requireString("uri"),
                     formatId = FORMAT_FIT,
-                    outputType = "video",
                     targetDir = call.requireString("targetDir"),
                     title = call.argument<String>("title"),
                     fit = FitSpec(
@@ -257,9 +256,8 @@ class YtDlpBridge(
             addOption("--no-playlist")
             addOption("--ignore-no-formats-error")
             addOption("--no-warnings")
-            applyUserOptions(options)
         }
-        val out = YoutubeDL.getInstance().execute(request).out
+        val out = run(request, options).out
         // yt-dlp prints `null` when the extractor found no media at all.
         if (out.isBlank() || out.trim() == "null") {
             throw YoutubeDLException("Unsupported URL: no media found")
@@ -295,9 +293,8 @@ class YtDlpBridge(
             addOption("--flat-playlist")
             addOption("--yes-playlist")
             addOption("--no-warnings")
-            applyUserOptions(options)
         }
-        val out = YoutubeDL.getInstance().execute(request).out
+        val out = run(request, options).out
         if (out.isBlank() || out.trim() == "null") {
             throw YoutubeDLException("Unsupported URL: no media found")
         }
@@ -321,9 +318,16 @@ class YtDlpBridge(
     private fun JSONObject.lastThumbnail(): String? =
         string("thumbnail") ?: optJSONArray("thumbnails")?.objects()?.lastOrNull()?.string("url")
 
-    private fun YoutubeDLRequest.applyUserOptions(options: List<String>) {
-        if (options.isNotEmpty()) addCommands(options)
-        Cookies.apply(context, this)
+    /** Runs [request] with the Settings [options] and the user's sign-ins. */
+    private fun run(request: YoutubeDLRequest, options: List<String>): YoutubeDLResponse {
+        if (options.isNotEmpty()) request.addCommands(options)
+        val cookies = File.createTempFile("cookies", ".txt", context.cacheDir)
+        try {
+            Cookies.apply(context, request, cookies)
+            return YoutubeDL.getInstance().execute(request)
+        } finally {
+            cookies.delete()
+        }
     }
 
     /**
@@ -374,9 +378,8 @@ class YtDlpBridge(
                 addOption("--sub-langs", lang)
                 addOption("--sub-format", "vtt/best")
                 addOption("-o", File(workDir, "transcript.%(ext)s").absolutePath)
-                applyUserOptions(options)
             }
-            YoutubeDL.getInstance().execute(request)
+            run(request, options)
             val file = workDir.listFiles()?.firstOrNull { it.isFile }
                 ?: throw FileNotFoundException("No captions for $lang")
             return mapOf("text" to file.readText(), "ext" to file.extension)

@@ -26,6 +26,10 @@ class App extends ConsumerWidget {
 
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     final fontFamily = settings.font.family;
+    final seed = switch (settings.themeColor.seed) {
+      final argb? => Color(argb),
+      null => null,
+    };
 
     // Wallpaper colours exist on Android 12+; elsewhere both are null.
     return DynamicColorBuilder(
@@ -34,10 +38,12 @@ class App extends ConsumerWidget {
         theme: AppTheme.light(
           fontFamily: fontFamily,
           wallpaper: settings.wallpaperColors ? lightWallpaper : null,
+          seed: seed,
         ),
         darkTheme: AppTheme.dark(
           fontFamily: fontFamily,
           wallpaper: settings.wallpaperColors ? darkWallpaper : null,
+          seed: seed,
           pureBlack: settings.pureBlack,
         ),
         themeMode: switch (settings.appearance) {

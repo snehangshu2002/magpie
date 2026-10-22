@@ -86,7 +86,6 @@ void main() {
       'id': 'abc',
       'url': 'https://example.com/video',
       'formatId': '18',
-      'outputType': 'video',
       'targetDir': 'Download/App/Generic',
       'title': 'Test video',
       'items': null,
