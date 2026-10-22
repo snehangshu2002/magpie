@@ -20,22 +20,30 @@ class WebPhotoSource {
 
   final HttpClient Function() _newClient;
 
-  static const _userAgent = 'android:com.snehangshu.magpie (Magpie)';
+  static const userAgent = 'android:com.snehangshu.magpie (Magpie)';
   static const _timeout = Duration(seconds: 15);
 
   /// The photos of the post at [url]; null when it has none (a video post,
-  /// a text post) or the site isn't one yt-dlp needs help with.
-  Future<WebPhotos?> photosOf(Uri url, SourcePlatform platform) async {
-    if (isImageLink(url)) return await imageAt(url);
+  /// a text post) or the site isn't one yt-dlp needs help with. [options]
+  /// are `networkArgs`: their proxy, `-4` and user agent apply here too.
+  Future<WebPhotos?> photosOf(
+    Uri url,
+    SourcePlatform platform, {
+    List<String> options = const [],
+  }) async {
+    if (isImageLink(url)) return await imageAt(url, options: options);
     return await switch (platform) {
-      SourcePlatform.x => _tweetPhotos(url),
-      SourcePlatform.telegram => _telegramPhotos(url),
+      SourcePlatform.x => _tweetPhotos(url, options),
+      SourcePlatform.telegram => _telegramPhotos(url, options),
       _ => Future.value(),
     };
   }
 
   /// The image at [url] in full size, if the link serves one.
-  Future<WebPhotos?> imageAt(Uri url) => _withClient((client) async {
+  Future<WebPhotos?> imageAt(
+    Uri url, {
+    List<String> options = const [],
+  }) => _withClient(options, (client) async {
     final full = fullSizeImageUrl(url);
     var response = await _send(client, 'HEAD', full);
     await response.drain<void>();
@@ -68,7 +76,20 @@ class WebPhotoSource {
     );
   });
 
-  Future<WebPhotos?> _tweetPhotos(Uri url) async {
+  /// The body of [url], e.g. a thumbnail to show.
+  Future<Uint8List> bytesOf(Uri url, {List<String> options = const []}) =>
+      _withClient(options, (client) async {
+        final response = await _send(client, 'GET', url);
+        if (response.statusCode != HttpStatus.ok) {
+          await response.drain<void>();
+          throw HttpException('HTTP ${response.statusCode}', uri: url);
+        }
+        final bytes = BytesBuilder(copy: false);
+        await response.forEach(bytes.add);
+        return bytes.takeBytes();
+      });
+
+  Future<WebPhotos?> _tweetPhotos(Uri url, List<String> options) async {
     final id = tweetIdOf(url);
     if (id == null) return null;
     final json = await _getJson(
@@ -77,14 +98,15 @@ class WebPhotoSource {
         'token': syndicationToken(id),
         'lang': 'en',
       }),
+      options,
     );
     return json is Map<String, dynamic> ? photosFromTweet(json) : null;
   }
 
-  Future<WebPhotos?> _telegramPhotos(Uri url) async {
+  Future<WebPhotos?> _telegramPhotos(Uri url, List<String> options) async {
     final post = telegramPostUri(url);
     if (post == null) return null;
-    final html = await _withClient((client) async {
+    final html = await _withClient(options, (client) async {
       final embed = post.replace(
         queryParameters: {'embed': '1', 'mode': 'tme'},
       );
@@ -98,15 +120,16 @@ class WebPhotoSource {
     return photosFromTelegramEmbed(html);
   }
 
-  Future<Object?> _getJson(Uri url) => _withClient((client) async {
-    final response = await _send(client, 'GET', url);
-    final body = await response.transform(utf8.decoder).join();
-    if (response.statusCode == HttpStatus.notFound) return null;
-    if (response.statusCode != HttpStatus.ok) {
-      throw HttpException('HTTP ${response.statusCode}', uri: url);
-    }
-    return jsonDecode(body);
-  });
+  Future<Object?> _getJson(Uri url, List<String> options) =>
+      _withClient(options, (client) async {
+        final response = await _send(client, 'GET', url);
+        final body = await response.transform(utf8.decoder).join();
+        if (response.statusCode == HttpStatus.notFound) return null;
+        if (response.statusCode != HttpStatus.ok) {
+          throw HttpException('HTTP ${response.statusCode}', uri: url);
+        }
+        return jsonDecode(body);
+      });
 
   Future<HttpClientResponse> _send(
     HttpClient client,
@@ -114,19 +137,65 @@ class WebPhotoSource {
     Uri url,
   ) async {
     final request = await client.openUrl(method, url).timeout(_timeout);
-    request.headers
-      ..set(HttpHeaders.userAgentHeader, _userAgent)
-      ..set(HttpHeaders.acceptHeader, '*/*');
+    request.headers.set(HttpHeaders.acceptHeader, '*/*');
     return await request.close().timeout(_timeout);
   }
 
-  Future<T> _withClient<T>(Future<T> Function(HttpClient) body) async {
+  Future<T> _withClient<T>(
+    List<String> options,
+    Future<T> Function(HttpClient) body,
+  ) async {
     final client = _newClient()..connectionTimeout = _timeout;
+    applyNetworkOptions(client, options, defaultUserAgent: userAgent);
     try {
       return await body(client);
     } finally {
       client.close(force: true);
     }
+  }
+}
+
+/// Sets up [client] for yt-dlp's network [options] (`networkArgs`): the
+/// last `--proxy`, `-4` and the last `--user-agent` (else
+/// [defaultUserAgent]), as yt-dlp reads them.
+void applyNetworkOptions(
+  HttpClient client,
+  List<String> options, {
+  required String defaultUserAgent,
+}) {
+  String? valueOf(String name) {
+    final i = options.lastIndexOf(name);
+    return i >= 0 && i + 1 < options.length ? options[i + 1] : null;
+  }
+
+  client.userAgent = valueOf('--user-agent') ?? defaultUserAgent;
+  final proxy = Uri.tryParse(valueOf('--proxy') ?? '');
+  // shortcut: HttpClient speaks only to plain HTTP proxies, so https:// and
+  // SOCKS proxies are skipped and these lookups go direct; upgrade with a
+  // SOCKS/TLS-capable client if users rely on those proxies for privacy.
+  if (proxy != null && proxy.scheme == 'http' && proxy.host.isNotEmpty) {
+    final auth = proxy.userInfo.isEmpty ? '' : '${proxy.userInfo}@';
+    final directive = 'PROXY $auth${proxy.host}:${proxy.port}';
+    client.findProxy = (_) => directive;
+  }
+  if (options.contains('-4')) {
+    client.connectionFactory = (url, proxyHost, proxyPort) async {
+      final host = proxyHost ?? url.host;
+      final addresses = await InternetAddress.lookup(
+        host,
+        type: InternetAddressType.IPv4,
+      );
+      final task = await Socket.startConnect(
+        addresses.first,
+        proxyPort ?? url.port,
+      );
+      // HttpClient expects TLS already set up for https without a proxy.
+      if (proxyHost != null || url.scheme != 'https') return task;
+      return ConnectionTask.fromSocket(
+        task.socket.then((s) => SecureSocket.secure(s, host: url.host)),
+        task.cancel,
+      );
+    };
   }
 }
 

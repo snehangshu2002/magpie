@@ -33,6 +33,10 @@ abstract class DownloadOption with _$DownloadOption {
 
     /// Full-size photos the engine downloads as they are ([photosSelector]).
     List<String>? imageUrls,
+
+    /// Saves the items of a playlist ([items] picks some) with
+    /// [formatSelector], each named by its own title.
+    @Default(false) bool playlist,
   }) = _DownloadOption;
 }
 
@@ -79,6 +83,10 @@ abstract class DownloadOptions with _$DownloadOptions {
     /// The items of a post with several, in order, so some can be saved
     /// without the rest; empty otherwise.
     @Default(<PostItem>[]) List<PostItem> postItems,
+
+    /// A playlist: [postItems] are its videos, picked on top of the type and
+    /// quality.
+    @Default(false) bool playlist,
   }) = _DownloadOptions;
 }
 
@@ -109,15 +117,20 @@ extension DownloadOptionsX on DownloadOptions {
   DownloadOption get recommended => defaultFor(recommendedType);
 
   /// Saves only [items] of the post; the whole post when they are none or
-  /// all of them.
-  DownloadOption optionFor(Iterable<PostItem> items) {
+  /// all of them. A playlist keeps the type and quality of [base].
+  DownloadOption optionFor(Iterable<PostItem> items, {DownloadOption? base}) {
     final picked = [
       for (final item in postItems)
         if (items.contains(item)) item,
     ];
-    if (picked.isEmpty || picked.length == postItems.length) {
-      return recommended;
+    final all = picked.isEmpty || picked.length == postItems.length;
+    if (playlist) {
+      return (base ?? recommended).copyWith(
+        items: all ? null : [for (final item in picked) item.index],
+        count: all ? postItems.length : picked.length,
+      );
     }
+    if (all) return recommended;
     if (recommended.imageUrls case final urls?) {
       return DownloadOption(
         type: OutputType.image,

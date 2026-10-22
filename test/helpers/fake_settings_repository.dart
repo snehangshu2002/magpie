@@ -22,4 +22,17 @@ class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<String?>> pickFolder() async => pickedFolder;
+
+  /// Sites signed in to.
+  List<String> sites = [];
+
+  @override
+  Future<Result<List<String>>> signedInSites() async => Ok(sites);
+
+  @override
+  Future<Result<List<String>>> signIn(String url) async => Ok(sites);
+
+  @override
+  Future<Result<List<String>>> signOut(String site) async =>
+      Ok(sites = [...sites]..remove(site));
 }

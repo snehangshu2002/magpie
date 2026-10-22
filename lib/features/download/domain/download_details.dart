@@ -8,6 +8,7 @@ final class DownloadDetails {
     this.ext,
     this.quality,
     this.sizeBytes,
+    this.videoKey,
   });
 
   final SourcePlatform platform;
@@ -17,4 +18,7 @@ final class DownloadDetails {
 
   /// Estimate; replaced by the real size once saved.
   final int? sizeBytes;
+
+  /// `<extractor> <id>` of a single video (`videoKeyOf`); null otherwise.
+  final String? videoKey;
 }

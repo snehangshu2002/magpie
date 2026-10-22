@@ -11,6 +11,7 @@ import 'package:media_downloader/core/platform/models/download_progress.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/engine_update_result.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
+import 'package:media_downloader/core/platform/models/playlist_info.dart';
 import 'package:media_downloader/core/platform/share_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/data/media_repository_impl.dart';
@@ -35,6 +36,7 @@ const _link = 'https://youtu.be/test123';
 const _clip = MediaInfo(
   title: 'Test clip',
   extractor: 'youtube',
+  id: 'abc',
   duration: 125,
   formats: [
     MediaFormat(
@@ -94,10 +96,37 @@ class _FakeMediaRepository implements MediaRepository {
   Failure? startFailure;
 
   @override
-  Future<Result<MediaInfo>> fetchInfo(Uri url) async {
+  Future<Result<MediaInfo>> fetchInfo(
+    Uri url, {
+    List<String> options = const [],
+  }) async {
     fetched.add(url);
     return Ok(info);
   }
+
+  /// What [fetchPlaylist] returns.
+  Result<PlaylistInfo> playlist = const Err(Failure.unsupportedUrl());
+
+  @override
+  Future<Result<PlaylistInfo>> fetchPlaylist(
+    Uri url, {
+    List<String> options = const [],
+  }) async {
+    fetched.add(url);
+    return playlist;
+  }
+
+  /// Videos in the Library, by `videoKeyOf`.
+  Set<String> savedVideos = {};
+
+  @override
+  Future<bool> isSaved(String videoKey) async => savedVideos.contains(videoKey);
+
+  /// What [isNetworkMetered] returns.
+  bool metered = false;
+
+  @override
+  Future<bool> isNetworkMetered() async => metered;
 
   /// What [fetchPhotos] returns.
   WebPhotos? photos;
@@ -105,19 +134,26 @@ class _FakeMediaRepository implements MediaRepository {
   @override
   Future<Result<WebPhotos?>> fetchPhotos(
     Uri url,
-    SourcePlatform platform,
-  ) async => Ok(photos);
+    SourcePlatform platform, {
+    List<String> options = const [],
+  }) async => Ok(photos);
 
   @override
-  Future<Result<WebPhotos?>> fetchImage(Uri url) async => const Ok(null);
+  Future<Result<WebPhotos?>> fetchImage(
+    Uri url, {
+    List<String> options = const [],
+  }) async => const Ok(null);
 
   /// What [fetchTranscript] returns.
   Result<String> transcript = const Ok('Hello there');
   final savedTexts = <String>[];
 
   @override
-  Future<Result<String>> fetchTranscript(Uri url, CaptionTrack track) async =>
-      transcript;
+  Future<Result<String>> fetchTranscript(
+    Uri url,
+    CaptionTrack track, {
+    List<String> options = const [],
+  }) async => transcript;
 
   @override
   Future<Result<String>> saveText({
@@ -132,8 +168,9 @@ class _FakeMediaRepository implements MediaRepository {
   @override
   Future<Result<String>> startDownload(
     DownloadRequest request,
-    DownloadDetails details,
-  ) async {
+    DownloadDetails details, {
+    bool record = true,
+  }) async {
     requests.add(request);
     return switch (startFailure) {
       final failure? => Err(failure),
@@ -207,7 +244,10 @@ void main() {
     await media.progress.close();
   });
 
-  Future<void> pumpApp(WidgetTester tester) async {
+  Future<void> pumpApp(
+    WidgetTester tester, {
+    AppSettings settings = const AppSettings(),
+  }) async {
     // A phone-sized screen, so the options aren't below the fold.
     tester.view
       ..physicalSize = const Size(1080, 2400)
@@ -221,7 +261,7 @@ void main() {
           engineRepositoryProvider.overrideWithValue(_FakeEngineRepository()),
           sharedTextProvider.overrideWith((ref) => shared.stream),
           settingsRepositoryProvider.overrideWithValue(
-            FakeSettingsRepository(),
+            FakeSettingsRepository(settings),
           ),
           libraryRepositoryProvider.overrideWithValue(library),
         ],
@@ -493,12 +533,79 @@ void main() {
     expect(find.text('Test clip'), findsOneWidget);
   });
 
-  testWidgets('a playlist link explains why it is not fetched', (tester) async {
+  testWidgets('a playlist is saved into a folder named after it', (
+    tester,
+  ) async {
+    media.playlist = const Ok(
+      PlaylistInfo(
+        title: 'Test mix',
+        extractor: 'youtube:tab',
+        entries: [
+          PlaylistEntry(title: 'One'),
+          PlaylistEntry(title: 'Two'),
+          PlaylistEntry(title: 'Three'),
+        ],
+      ),
+    );
     await pumpApp(tester);
     await submit(tester, 'https://www.youtube.com/playlist?list=PLtest');
 
-    expect(find.textContaining("Playlists aren't supported"), findsOneWidget);
-    expect(media.fetched, isEmpty);
+    expect(find.text('3 videos'), findsWidgets);
+    await tester.tap(find.text('Download').first);
+    await tester.pump(const Duration(seconds: 1));
+
+    final request = media.requests.single;
+    expect(request.playlist, isTrue);
+    expect(request.items, isNull);
+    expect(request.formatId, 'bv*+ba/b');
+    expect(request.targetDir, 'Download/Magpie/YouTube/Test mix');
+    // The default 1080p cap, by short side.
+    expect(request.options, containsAllInOrder(['-S', 'res:1080']));
+  });
+
+  testWidgets('download right away starts and follows the download', (
+    tester,
+  ) async {
+    await pumpApp(tester, settings: const AppSettings(downloadRightAway: true));
+    await tester.enterText(find.byType(TextField), _link);
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    // Not pumpAndSettle: the running download's bar keeps animating.
+    await pumpFor(tester);
+    await pumpFor(tester);
+
+    expect(media.requests, hasLength(1));
+    expect(find.text('Waiting to start…'), findsOneWidget);
+    media.emit(DownloadState.running, percent: 45.6);
+    await pumpFor(tester);
+
+    // The bar shows the download that started by itself, not a fresh button.
+    expect(find.text('Downloading'), findsOneWidget);
+  });
+
+  testWidgets('a video in the Library is not saved again when asked', (
+    tester,
+  ) async {
+    media.savedVideos = {'youtube abc'};
+    await pumpApp(tester, settings: const AppSettings(skipDownloaded: true));
+    await submit(tester, _link);
+    await tester.tap(find.text('Download · 48 MB'));
+    await pumpFor(tester);
+
+    expect(media.requests, isEmpty);
+    expect(find.textContaining('Already downloaded'), findsOneWidget);
+  });
+
+  testWidgets('a video deleted from the Library can be saved again', (
+    tester,
+  ) async {
+    await pumpApp(tester, settings: const AppSettings(skipDownloaded: true));
+    await submit(tester, _link);
+    await tester.tap(find.text('Download · 48 MB'));
+    await pumpFor(tester);
+
+    final request = media.requests.single;
+    // Only playlists use yt-dlp's archive, which never forgets a video.
+    expect(request.archive, isFalse);
   });
 
   testWidgets('text that is not a link gets a quiet hint', (tester) async {

@@ -9,11 +9,14 @@ import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/data/media_repository_impl.dart';
+import 'package:media_downloader/features/download/domain/download_args.dart';
 import 'package:media_downloader/features/download/domain/download_details.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
+import 'package:media_downloader/features/download/domain/playlist_options.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
 import 'package:media_downloader/features/download/domain/web_photo.dart';
+import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -45,9 +48,10 @@ Future<MediaPreview> mediaPreview(
   SourcePlatform platform,
 ) async {
   final repository = ref.watch(mediaRepositoryProvider);
-  final photosCall = repository.fetchPhotos(url, platform);
+  final network = networkArgs(await ref.read(settingsProvider.future));
+  final photosCall = repository.fetchPhotos(url, platform, options: network);
   // yt-dlp can't read a link to an image file; don't wait for it to say so.
-  final info = isImageLink(url) ? null : await _fetchInfo(ref, url);
+  final info = isImageLink(url) ? null : await _fetchInfo(ref, url, network);
   // A failed photo lookup leaves yt-dlp's result as it is.
   var photos = switch (await photosCall) {
     Ok(:final value) => value,
@@ -56,7 +60,7 @@ Future<MediaPreview> mediaPreview(
   if (photos == null &&
       info is Err<MediaInfo> &&
       info.failure is UnsupportedUrlFailure) {
-    photos = switch (await repository.fetchImage(url)) {
+    photos = switch (await repository.fetchImage(url, options: network)) {
       Ok(:final value) => value,
       Err() => null,
     };
@@ -94,15 +98,74 @@ Future<MediaPreview> mediaPreview(
   return MediaPreview(info: media, platform: resolved, options: options);
 }
 
-Future<Result<MediaInfo>> _fetchInfo(Ref ref, Uri url) async {
-  // A link shared right after launch would otherwise be read by the old
-  // yt-dlp while the new one downloads. Don't wait forever on a slow network.
+/// Fetches the playlist at [url] and offers its videos, as video or audio.
+@riverpod
+Future<MediaPreview> playlistPreview(
+  Ref ref,
+  Uri url,
+  SourcePlatform platform,
+) async {
+  await _waitForEngineUpdate(ref);
+  final settings = await ref.read(settingsProvider.future);
+  final info =
+      (await ref
+              .read(mediaRepositoryProvider)
+              .fetchPlaylist(url, options: networkArgs(settings)))
+          .getOrThrow();
+  final resolved = platform == SourcePlatform.other
+      ? SourcePlatform.fromExtractor(info.extractor)
+      : platform;
+  final (maxQuality, preferAudioForMusic) = await ref.watch(
+    settingsProvider.selectAsync((s) => (s.maxQuality, s.preferAudioForMusic)),
+  );
+  final options = playlistOptions(
+    info,
+    platform: resolved,
+    maxQuality: maxQuality,
+    preferAudioForMusic: preferAudioForMusic,
+  );
+  if (options == null) throw const Failure.unsupportedUrl();
+  return MediaPreview(
+    info: MediaInfo(
+      title: info.title,
+      extractor: info.extractor,
+      thumbnail: info.thumbnail,
+    ),
+    platform: resolved,
+    options: options,
+  );
+}
+
+Future<Result<MediaInfo>> _fetchInfo(
+  Ref ref,
+  Uri url,
+  List<String> options,
+) async {
+  await _waitForEngineUpdate(ref);
+  return await ref
+      .read(mediaRepositoryProvider)
+      .fetchInfo(url, options: options);
+}
+
+/// A link shared right after launch would otherwise be read by the old
+/// yt-dlp while the new one downloads. Doesn't wait forever on a slow network.
+Future<void> _waitForEngineUpdate(Ref ref) async {
   try {
     await ref.read(engineAutoUpdateProvider.future).timeout(_engineUpdateWait);
   } on Object {
     // Slow or failed: the installed yt-dlp still reads most sites.
   }
-  return await ref.read(mediaRepositoryProvider).fetchInfo(url);
+}
+
+/// The part of [url]'s video to save; null saves all of it.
+@riverpod
+class ClipSelection extends _$ClipSelection {
+  @override
+  ClipRange? build(Uri url) => null;
+
+  // A method, not a setter, to read like the other notifier actions.
+  // ignore: use_setters_to_change_properties
+  void set(ClipRange? range) => state = range;
 }
 
 /// The option the user picked for [url]; null means the recommended one.
@@ -156,6 +219,17 @@ class DownloadStarter extends _$DownloadStarter {
     ref.read(cancelRequestedProvider(url).notifier).set(value: false);
     state = const AsyncLoading();
     final repository = ref.read(mediaRepositoryProvider);
+    final settings = await ref.read(settingsProvider.future);
+    final videoKey = option.playlist ? null : videoKeyOf(preview.info, option);
+    // A video that is in the Library; deleting it there allows it again.
+    if (settings.skipDownloaded &&
+        videoKey != null &&
+        await repository.isSaved(videoKey)) {
+      if (ref.mounted) {
+        state = AsyncError(const Failure.nothingNew(), StackTrace.current);
+      }
+      return;
+    }
     final id = _newId();
     // Listen first, so events sent while the call returns are not missed.
     _progress = repository.progressOf(id).listen(_onProgress);
@@ -165,23 +239,34 @@ class DownloadStarter extends _$DownloadStarter {
         url: url.toString(),
         formatId: option.formatSelector,
         outputType: option.type,
-        targetDir: saveDirFor(
-          (await ref.read(settingsProvider.future)).saveFolder,
-          preview.platform,
-        ),
+        targetDir: saveTargetFor(settings, preview, option),
         title: preview.info.title,
         items: option.items,
         imageUrls: option.imageUrls,
+        options: downloadArgs(
+          settings,
+          option,
+          clip: option.playlist ? null : ref.read(clipSelectionProvider(url)),
+        ),
+        playlist: option.playlist,
+        // Single videos are checked against the Library above.
+        archive: option.playlist && settings.skipDownloaded,
+        fileName: switch (settings.fileNameTemplate.trim()) {
+          '' => null,
+          final template => template,
+        },
       ),
       DownloadDetails(
         platform: preview.platform,
         thumbnail:
             preview.options.postItemsOf(option).firstOrNull?.thumbnail ??
             preview.info.thumbnail,
-        ext: option.ext,
-        quality: option.quality,
+        ext: savedExtOf(settings, option),
+        quality: option.quality == bestAvailableQuality ? null : option.quality,
         sizeBytes: option.sizeBytes,
+        videoKey: videoKey,
       ),
+      record: settings.keepHistory,
     );
     if (!ref.mounted) return;
     switch (result) {
@@ -230,6 +315,23 @@ class DownloadStarter extends _$DownloadStarter {
   void _stopFollowing() {
     unawaited(_progress?.cancel());
     _progress = null;
+  }
+
+  /// Where [option] of [preview] is saved: audio in its own folder when one
+  /// is set, a playlist in a folder named after it.
+  static String saveTargetFor(
+    AppSettings settings,
+    MediaPreview preview,
+    DownloadOption option,
+  ) {
+    final folder =
+        option.type == OutputType.audio && settings.audioFolder.isNotEmpty
+        ? settings.audioFolder
+        : settings.saveFolder;
+    final dir = saveDirFor(folder, preview.platform);
+    return option.playlist
+        ? '$dir/${playlistFolderName(preview.info.title)}'
+        : dir;
   }
 
   static final _random = Random.secure();

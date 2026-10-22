@@ -9,6 +9,10 @@ abstract class MediaInfo with _$MediaInfo {
   const factory({
     required String title,
     required String extractor,
+
+    /// yt-dlp's id of the video on its site; with [extractor], it tells
+    /// whether the same video was saved before.
+    String? id,
     String? thumbnail,
 
     /// Seconds; null for images and live streams.

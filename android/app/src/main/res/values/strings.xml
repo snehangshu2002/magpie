@@ -13,4 +13,7 @@
     <string name="download_saved_to">Saved to %1$s</string>
     <string name="download_failed">Download failed</string>
     <string name="download_cancel">Cancel</string>
+    <!-- Signing in to a site for downloads (SignInActivity). -->
+    <string name="sign_in_hint">Sign in to %1$s, then tap Done</string>
+    <string name="sign_in_done">Done</string>
 </resources>

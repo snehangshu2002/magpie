@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
+import 'package:media_downloader/features/download/presentation/web_image_of.dart';
 import 'package:media_downloader/features/library/presentation/library_providers.dart';
 
 /// A preview from the saved file, else yt-dlp's thumbnail, else an icon for
@@ -64,8 +65,8 @@ class LibraryThumbnail extends ConsumerWidget {
               gaplessPlayback: true,
             ),
             AsyncLoading() => const SizedBox.expand(key: ValueKey('loading')),
-            _ when remote != null => Image.network(
-              remote,
+            _ when remote != null => Image(
+              image: webImageOf(ref, remote),
               key: const ValueKey('remote'),
               fit: BoxFit.cover,
               width: double.infinity,

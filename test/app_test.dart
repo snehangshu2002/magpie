@@ -130,7 +130,12 @@ void main() {
       .first;
 
   Future<void> tapSetting(WidgetTester tester, String title) async {
-    await tester.ensureVisible(find.text(title));
+    // Rows below the screen aren't built until scrolled to.
+    await tester.scrollUntilVisible(
+      find.text(title),
+      200,
+      scrollable: settingsList,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text(title));
     await tester.pumpAndSettle();

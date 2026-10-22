@@ -26,6 +26,10 @@ sealed class Failure with _$Failure implements Exception {
   /// Re-encoding a saved video failed.
   const factory encode({String? detail}) = EncodeFailure;
 
+  /// The video, or every video of a playlist, was downloaded before ("Skip
+  /// videos already downloaded").
+  const factory nothingNew() = NothingNewFailure;
+
   /// The native side doesn't implement the call yet (e.g. a feature that
   /// hasn't shipped in this build).
   const factory unavailable({String? detail}) = UnavailableFailure;

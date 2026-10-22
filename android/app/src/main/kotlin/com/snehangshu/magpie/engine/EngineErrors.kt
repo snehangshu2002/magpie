@@ -23,6 +23,7 @@ internal object EngineErrors {
     const val NO_APP = "NO_APP"
     const val TOO_LARGE = "TOO_LARGE"
     const val ENCODE = "ENCODE"
+    const val NOTHING_NEW = "NOTHING_NEW"
     const val UNKNOWN = "UNKNOWN"
 
     data class Error(val code: String, val message: String?)
@@ -34,6 +35,9 @@ internal object EngineErrors {
         "Temporary failure in name resolution",
         "Network is unreachable",
         "timed out",
+        // A proxy from Settings that isn't answering.
+        "Unable to connect to proxy",
+        "Connection refused",
     )
 
     fun from(e: Exception): Error = when (e) {
@@ -46,6 +50,7 @@ internal object EngineErrors {
         is StorageException -> Error(STORAGE, e.message)
         is FitTooLargeException -> Error(TOO_LARGE, e.message)
         is EncodeException -> Error(ENCODE, e.message)
+        is NothingNewException -> Error(NOTHING_NEW, e.message)
         is ImageFetcher.CancelledException -> Error(CANCELLED, e.message)
         is NotAnImageException -> Error(UNSUPPORTED_URL, e.message)
         is HttpStatusException -> Error(NETWORK, e.message)

@@ -37,7 +37,6 @@
   "platformOther": "Website",
   "noticeInvalidLink": "That doesn't look like a link.",
   "noticeClipboardEmpty": "There's no link on the clipboard.",
-  "noticePlaylistUnsupported": "Playlists aren't supported yet; share a single video instead.",
   "supportedTitle": "Works with",
   "shareTipTitle": "Tip",
   "shareTip": "In any app, tap {share} and choose {appName} to instantly grab videos and photos.",
@@ -476,6 +475,104 @@
     "placeholders": {
       "title": {"type": "String"},
       "size": {"type": "String"}
+    }
+  },
+  "mobileDataTitle": "You're on mobile data",
+  "mobileDataBody": "This download may use a lot of data. Download now anyway?",
+  "mobileDataWait": "Not now",
+  "mobileDataDownload": "Download",
+  "failureNothingNew": "Already downloaded. To save it again, turn off “Skip videos already downloaded” in Settings.",
+  "playlistPickTitle": "Choose videos",
+  "clipTitle": "Save only a part",
+  "clipHint": "Pick where it starts and ends",
+  "settingsWallpaperColors": "Wallpaper colours",
+  "settingsWallpaperColorsHint": "Take the app's colours from your wallpaper (Android 12 and newer)",
+  "settingsPureBlack": "Pure black dark theme",
+  "settingsPureBlackHint": "Black backgrounds in the dark theme",
+  "settingsAudioLocation": "Music save location",
+  "settingsAudioLocationSame": "Same folder as videos",
+  "settingsAudioLocationPick": "Choose a folder…",
+  "settingsRightAway": "Download right away",
+  "settingsRightAwayHint": "Start the suggested download as soon as a link is read",
+  "settingsMobileData": "Ask before using mobile data",
+  "settingsMobileDataHint": "Check with you before downloading on mobile data",
+  "settingsSkipDownloaded": "Skip videos already downloaded",
+  "settingsSkipDownloadedHint": "Don't save a video again, alone or in a playlist",
+  "settingsKeepHistory": "Keep a history",
+  "settingsKeepHistoryHint": "List downloads in your Library. Turn off to save files without keeping a record in the app",
+  "settingsFiles": "Saved files",
+  "settingsAudioFormat": "Music format",
+  "settingsAudioFormatHint": "Convert audio downloads to this format",
+  "audioFormatOriginal": "As the site has it",
+  "settingsCoverArt": "Add cover art",
+  "settingsCoverArtHint": "Put the thumbnail into the file, where players can show it",
+  "settingsSquareCover": "Square cover art",
+  "settingsSquareCoverHint": "Crop music cover art to a square",
+  "settingsMetadata": "Add title and artist",
+  "settingsMetadataHint": "Save the title, channel and date inside the file",
+  "settingsSubtitles": "Add subtitles",
+  "settingsSubtitlesHint": "Put subtitles into saved videos when the video has them",
+  "settingsSubtitleLanguage": "Subtitle language",
+  "settingsAutoCaptions": "Use automatic captions",
+  "settingsAutoCaptionsHint": "When there are no subtitles, use captions the site made",
+  "settingsSkipSponsors": "Skip sponsor segments",
+  "settingsSkipSponsorsHint": "Cut sponsored parts out of YouTube videos, using SponsorBlock",
+  "settingsMkv": "Save videos as MKV",
+  "settingsMkvHint": "Keeps every stream as it is; some players can't open MKV",
+  "settingsAccounts": "Accounts",
+  "settingsSignedIn": "Signed in for downloads",
+  "settingsSignOut": "Sign out",
+  "settingsSignIn": "Sign in to a site",
+  "settingsSignInHint": "Download what your account can see, like age-restricted videos. Stays on this phone",
+  "settingsAdvanced": "Advanced",
+  "settingsSpeedLimit": "Speed limit",
+  "settingsSpeedLimitOff": "No limit",
+  "settingsParallel": "Download in pieces",
+  "settingsParallelHint": "Fetch several parts of a video at once; often faster",
+  "settingsAria2": "Use aria2",
+  "settingsAria2Hint": "A different downloader for unsteady connections; usually slower on YouTube",
+  "settingsProxy": "Proxy",
+  "settingsProxyNone": "None",
+  "settingsProxyInvalid": "Use a link like socks5://host:port or http://host:port",
+  "settingsIpv4": "Use IPv4 only",
+  "settingsIpv4Hint": "Helps when a site blocks or slows IPv6",
+  "settingsUserAgent": "Browser identity",
+  "settingsUserAgentDefault": "Default",
+  "settingsFileNames": "File names",
+  "settingsFileNamesDefault": "The title",
+  "settingsFileNamesInvalid": "Use fields like %(title)s, and no /",
+  "settingsSimpleNames": "Simple file names",
+  "settingsSimpleNamesHint": "Only plain letters and numbers, no spaces",
+  "settingsExtraOptions": "Extra download options",
+  "settingsExtraOptionsNone": "None",
+  "settingsExtraOptionsQuote": "A quote isn't closed",
+  "settingsClear": "Clear",
+  "settingsSave": "Save",
+  "playlistVideos": "{count, plural, =1{1 video} other{{count} videos}}",
+  "@playlistVideos": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "clipRange": "{start} to {end}",
+  "@clipRange": {
+    "description": "The part of a video to save, e.g. '0:12 to 1:30'.",
+    "placeholders": {
+      "start": {"type": "String"},
+      "end": {"type": "String"}
+    }
+  },
+  "perSecond": "{size}/s",
+  "@perSecond": {
+    "description": "A download speed, e.g. '2 MB/s'.",
+    "placeholders": {
+      "size": {"type": "String"}
+    }
+  },
+  "settingsExtraOptionsReserved": "{option} is set by the app",
+  "@settingsExtraOptionsReserved": {
+    "placeholders": {
+      "option": {"type": "String"}
     }
   }
 }

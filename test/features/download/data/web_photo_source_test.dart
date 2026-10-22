@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_downloader/features/download/data/web_photo_source.dart';
 import 'package:media_downloader/features/download/domain/web_photo.dart';
@@ -142,6 +145,93 @@ void main() {
           '<a class="tgme_widget_message_video_player" href="#"></a>',
         ),
         isNull,
+      );
+    });
+  });
+
+  group('network settings', () {
+    late HttpServer server;
+    late List<HttpRequest> requests;
+
+    setUp(() async {
+      requests = [];
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0)
+        ..listen((request) async {
+          requests.add(request);
+          request.response.headers.contentType = ContentType('image', 'png');
+          await request.response.close();
+        });
+    });
+    tearDown(() => server.close(force: true));
+
+    test('go through the proxy with the chosen browser identity', () async {
+      final photos = await WebPhotoSource().imageAt(
+        Uri.parse('http://photos.invalid/cat.png'),
+        options: [
+          '--proxy',
+          'http://127.0.0.1:${server.port}',
+          '-4',
+          '--user-agent',
+          'Test Browser',
+        ],
+      );
+
+      expect(photos!.photos.single.url, 'http://photos.invalid/cat.png');
+      // A proxy gets the whole URL; the made-up host never resolved here.
+      expect(requests.single.uri.toString(), 'http://photos.invalid/cat.png');
+      expect(requests.single.headers.value('user-agent'), 'Test Browser');
+    });
+
+    test('-4 connects over IPv4', () async {
+      final photos = await WebPhotoSource().imageAt(
+        Uri.parse('http://localhost:${server.port}/cat.png'),
+        options: ['-4'],
+      );
+
+      expect(photos, isNotNull);
+      expect(
+        requests.single.connectionInfo!.remoteAddress.type,
+        InternetAddressType.IPv4,
+      );
+    });
+
+    test('leave requests direct with the app identity when unset', () async {
+      for (final options in [
+        const <String>[],
+        // HttpClient can't use these proxies; the lookup goes direct.
+        ['--proxy', 'socks5://127.0.0.1:1'],
+        ['--proxy', 'https://127.0.0.1:1'],
+      ]) {
+        requests.clear();
+        await WebPhotoSource().imageAt(
+          Uri.parse('http://127.0.0.1:${server.port}/cat.png'),
+          options: options,
+        );
+
+        expect(requests.single.uri.toString(), '/cat.png', reason: '$options');
+        expect(requests.single.headers.value('user-agent'), contains('Magpie'));
+      }
+    });
+
+    test('fetch thumbnails through the proxy', () async {
+      final bytes = await WebPhotoSource().bytesOf(
+        Uri.parse('http://photos.invalid/thumb.png'),
+        options: ['--proxy', 'http://127.0.0.1:${server.port}'],
+      );
+
+      expect(bytes, isEmpty);
+      expect(requests.single.uri.toString(), 'http://photos.invalid/thumb.png');
+    });
+
+    test('send proxy credentials', () async {
+      await WebPhotoSource().imageAt(
+        Uri.parse('http://photos.invalid/cat.png'),
+        options: ['--proxy', 'http://me:secret@127.0.0.1:${server.port}'],
+      );
+
+      expect(
+        requests.single.headers.value('proxy-authorization'),
+        'Basic ${base64.encode(utf8.encode('me:secret'))}',
       );
     });
   });

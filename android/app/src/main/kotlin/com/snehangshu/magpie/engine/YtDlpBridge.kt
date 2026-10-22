@@ -2,7 +2,9 @@ package com.snehangshu.magpie.engine
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.os.Build
 import android.util.Log
 import com.snehangshu.magpie.ActivityHost
@@ -73,7 +75,12 @@ class YtDlpBridge(
 
             "fetchInfo" -> respond(result) {
                 Engine.ensureInitialized(context)
-                fetchInfo(call.requireString("url"))
+                fetchInfo(call.requireString("url"), call.options())
+            }
+
+            "fetchPlaylist" -> respond(result) {
+                Engine.ensureInitialized(context)
+                fetchPlaylist(call.requireString("url"), call.options())
             }
 
             "fetchTranscript" -> respond(result) {
@@ -82,6 +89,7 @@ class YtDlpBridge(
                     url = call.requireString("url"),
                     lang = call.requireString("lang"),
                     auto = call.argument<Boolean>("auto") ?: false,
+                    options = call.options(),
                 )
             }
 
@@ -95,6 +103,10 @@ class YtDlpBridge(
                     title = call.argument<String>("title"),
                     items = call.argument<List<Int>>("items"),
                     imageUrls = call.argument<List<String>>("imageUrls"),
+                    options = call.options(),
+                    playlist = call.argument<Boolean>("playlist") ?: false,
+                    archive = call.argument<Boolean>("archive") ?: false,
+                    fileName = call.argument<String>("fileName"),
                 )
                 requestDownloadPermissions()
                 withContext(Dispatchers.Main) { DownloadService.start(context, request) }
@@ -130,6 +142,29 @@ class YtDlpBridge(
             }
 
             "takeFinishedDownloads" -> respond(result) { DownloadResults.take(context) }
+
+            "networkStatus" -> respond(result) {
+                val connectivity = context.getSystemService(ConnectivityManager::class.java)
+                mapOf("metered" to connectivity.isActiveNetworkMetered)
+            }
+
+            "signIn" -> respond(result) {
+                val url = call.requireString("url")
+                host.pick(
+                    Intent(context, SignInActivity::class.java)
+                        .putExtra(SignInActivity.EXTRA_URL, url),
+                )
+                Cookies.sites(context)
+            }
+
+            "signedInSites" -> respond(result) { Cookies.sites(context) }
+
+            "signOut" -> respond(result) {
+                withContext(Dispatchers.Main) {
+                    Cookies.remove(context, call.requireString("site"))
+                }
+                Cookies.sites(context)
+            }
 
             "updateEngine" -> respond(result) {
                 val channel = when (call.argument<String>("channel")) {
@@ -201,6 +236,9 @@ class YtDlpBridge(
     private fun MethodCall.requireString(key: String): String =
         argument<String>(key) ?: throw IllegalArgumentException("Missing argument: $key")
 
+    /** Extra yt-dlp arguments Dart chose from Settings (proxy, speed limit, ...). */
+    private fun MethodCall.options(): List<String> = argument<List<String>>("options").orEmpty()
+
     private fun MethodCall.requireInt(key: String): Int =
         argument<Number>(key)?.toInt() ?: throw IllegalArgumentException("Missing argument: $key")
 
@@ -213,12 +251,13 @@ class YtDlpBridge(
      * Instagram carousel) as one result with `entries`; items without formats
      * (photos) are reported instead of failing the whole link.
      */
-    private fun fetchInfo(url: String): Map<String, Any?> {
+    private fun fetchInfo(url: String, options: List<String>): Map<String, Any?> {
         val request = YoutubeDLRequest(url).apply {
             addOption("-J")
             addOption("--no-playlist")
             addOption("--ignore-no-formats-error")
             addOption("--no-warnings")
+            applyUserOptions(options)
         }
         val out = YoutubeDL.getInstance().execute(request).out
         // yt-dlp prints `null` when the extractor found no media at all.
@@ -228,6 +267,7 @@ class YtDlpBridge(
         val json = JSONObject(out)
         val entries = json.optJSONArray("entries")?.objects()
         return mapOf(
+            "id" to json.string("id"),
             "title" to (json.string("title") ?: json.string("fulltitle") ?: json.string("id")),
             "thumbnail" to (json.string("thumbnail") ?: entries?.firstNotNullOfOrNull { it.string("thumbnail") }),
             "duration" to json.positiveInt("duration"),
@@ -243,6 +283,47 @@ class YtDlpBridge(
                 )
             },
         )
+    }
+
+    /**
+     * The items of the playlist at [url], without looking up each one
+     * (`--flat-playlist`), so even a long playlist answers quickly.
+     */
+    private fun fetchPlaylist(url: String, options: List<String>): Map<String, Any?> {
+        val request = YoutubeDLRequest(url).apply {
+            addOption("-J")
+            addOption("--flat-playlist")
+            addOption("--yes-playlist")
+            addOption("--no-warnings")
+            applyUserOptions(options)
+        }
+        val out = YoutubeDL.getInstance().execute(request).out
+        if (out.isBlank() || out.trim() == "null") {
+            throw YoutubeDLException("Unsupported URL: no media found")
+        }
+        val json = JSONObject(out)
+        val entries = json.optJSONArray("entries")?.objects().orEmpty()
+        return mapOf(
+            "title" to (json.string("title") ?: json.string("id")),
+            "extractor" to (json.string("extractor") ?: json.string("extractor_key")),
+            "thumbnail" to (json.lastThumbnail() ?: entries.firstNotNullOfOrNull { it.lastThumbnail() }),
+            "entries" to entries.map {
+                mapOf(
+                    "title" to it.string("title"),
+                    "duration" to it.positiveInt("duration"),
+                    "thumbnail" to it.lastThumbnail(),
+                )
+            },
+        )
+    }
+
+    /** `thumbnail`, else the last (largest) of `thumbnails`. */
+    private fun JSONObject.lastThumbnail(): String? =
+        string("thumbnail") ?: optJSONArray("thumbnails")?.objects()?.lastOrNull()?.string("url")
+
+    private fun YoutubeDLRequest.applyUserOptions(options: List<String>) {
+        if (options.isNotEmpty()) addCommands(options)
+        Cookies.apply(context, this)
     }
 
     /**
@@ -276,7 +357,12 @@ class YtDlpBridge(
      * The caption track [lang] of [url] as WebVTT text, without downloading
      * the video; [auto] picks YouTube's automatic captions.
      */
-    private fun fetchTranscript(url: String, lang: String, auto: Boolean): Map<String, Any?> {
+    private fun fetchTranscript(
+        url: String,
+        lang: String,
+        auto: Boolean,
+        options: List<String>,
+    ): Map<String, Any?> {
         val workDir = File(context.cacheDir, "transcripts/${System.nanoTime()}")
         workDir.mkdirs()
         try {
@@ -288,6 +374,7 @@ class YtDlpBridge(
                 addOption("--sub-langs", lang)
                 addOption("--sub-format", "vtt/best")
                 addOption("-o", File(workDir, "transcript.%(ext)s").absolutePath)
+                applyUserOptions(options)
             }
             YoutubeDL.getInstance().execute(request)
             val file = workDir.listFiles()?.firstOrNull { it.isFile }
