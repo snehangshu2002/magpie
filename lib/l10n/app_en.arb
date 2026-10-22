@@ -333,6 +333,24 @@
   "fontSerif": "Classic",
   "fontSerifHint": "Like the pages of a book",
   "settingsUpdates": "Updates",
+  "settingsAppUpdate": "Magpie updates",
+  "settingsAppUpdateChecking": "Checking for a new version…",
+  "settingsAppUpdateCurrent": "You have the latest version ({version})",
+  "@settingsAppUpdateCurrent": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "settingsAppUpdateLatest": "You have the latest version",
+  "settingsAppUpdateAvailable": "Magpie {version} is ready to install",
+  "@settingsAppUpdateAvailable": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "settingsAppUpdateFailed": "Couldn't check for a new version",
+  "settingsAppUpdateCheck": "Check",
+  "settingsAppUpdateNow": "Update now",
   "settingsAutoUpdate": "Automatic updates",
   "settingsAutoUpdateChecking": "Checking for updates…",
   "settingsAutoUpdateDone": "Up to date. Keeps downloads working as sites change",
@@ -367,6 +385,22 @@
     }
   },
   "updateLater": "Later",
+  "updateDownloading": "Downloading… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "updateDownloadingSize": "{received} of {total}",
+  "@updateDownloadingSize": {
+    "placeholders": {
+      "received": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+  "updateDownloadingUnknown": "Downloading…",
+  "updateReady": "Finish the update in Android's installer.",
+  "updateInstallAgain": "Install",
   "loading": "Loading…",
   "retry": "Retry",
   "postTextDescription": "Description",

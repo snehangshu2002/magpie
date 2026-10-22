@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,8 +48,13 @@ class _FakeUpdateRepository implements UpdateRepository {
   final AppUpdate? update;
   final opened = <String>[];
 
+  int checks = 0;
+
   @override
-  Future<Result<AppUpdate?>> check() async => Ok(update);
+  Future<Result<AppUpdate?>> check() async {
+    checks++;
+    return Ok(update);
+  }
 
   @override
   Future<Result<String>> installedVersion() async => const Ok('1.1.0');
@@ -55,6 +62,29 @@ class _FakeUpdateRepository implements UpdateRepository {
   @override
   Future<Result<void>> open(String url) async {
     opened.add(url);
+    return const Ok(null);
+  }
+
+  final installed = <String>[];
+
+  /// Completes the download started by the update sheet.
+  final Completer<void> downloadDone = Completer();
+
+  @override
+  Future<Result<String>> download(
+    AppUpdate update, {
+    required void Function(int received, int? total) onProgress,
+    required bool Function() isCancelled,
+  }) async {
+    onProgress(8000000, update.size);
+    await downloadDone.future;
+    if (isCancelled()) return const Err(Failure.cancelled());
+    return const Ok('/cache/updates/magpie.apk');
+  }
+
+  @override
+  Future<Result<void>> install(String path, AppUpdate update) async {
+    installed.add(path);
     return const Ok(null);
   }
 }
@@ -120,7 +150,8 @@ void main() {
       url: 'https://example.com/a.apk',
       pageUrl: 'https://example.com/release',
       size: 32000000,
-      notes: const ['Reddit carousels'],
+      apkName: 'magpie-1.2.0-arm64-v8a.apk',
+      notes: const ['Faster downloads'],
       published: DateTime(2026, 10, 15),
     );
     final updates = _FakeUpdateRepository(update);
@@ -130,11 +161,45 @@ void main() {
     expect(find.text('Magpie 1.2.0 is available'), findsOneWidget);
     expect(find.text('32 MB · Release notes'), findsOneWidget);
     expect(find.text('Oct 2026'), findsOneWidget);
-    expect(find.text('Reddit carousels'), findsOneWidget);
+    expect(find.text('Faster downloads'), findsOneWidget);
     await tester.tap(find.text('Update (32 MB)'));
+    await tester.pump();
+
+    // Downloads inside the app, with progress; no browser.
+    expect(find.text('Downloading… 25%'), findsOneWidget);
+    expect(find.text('8 MB of 32 MB'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(updates.opened, isEmpty);
+
+    updates.downloadDone.complete();
     await tester.pumpAndSettle();
 
-    expect(updates.opened, ['https://example.com/a.apk']);
+    expect(updates.installed, ['/cache/updates/magpie.apk']);
+    expect(
+      find.text("Finish the update in Android's installer."),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Install'));
+    await tester.pumpAndSettle();
+    expect(updates.installed, hasLength(2));
+  });
+
+  testWidgets('without an APK for this phone, the release page opens', (
+    tester,
+  ) async {
+    const update = AppUpdate(
+      version: '1.2.0',
+      url: 'https://example.com/release',
+      pageUrl: 'https://example.com/release',
+    );
+    final updates = _FakeUpdateRepository(update);
+    await pumpApp(tester, updates: updates);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Update'));
+    await tester.pumpAndSettle();
+
+    expect(updates.opened, ['https://example.com/release']);
     expect(find.text('Magpie 1.2.0 is available'), findsNothing);
   });
 
@@ -167,6 +232,55 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(updates.opened, ['https://github.com/snehangshu2002/magpie']);
+  });
+
+  testWidgets('settings says Magpie is up to date and can check again', (
+    tester,
+  ) async {
+    final updates = _FakeUpdateRepository();
+    await pumpApp(tester, updates: updates);
+    await openSettings(tester);
+    // Past the row, so it isn't under the navigation bar.
+    await tester.scrollUntilVisible(
+      find.text('Your privacy'),
+      200,
+      scrollable: settingsList,
+    );
+
+    expect(find.text('You have the latest version (1.1.0)'), findsOneWidget);
+    expect(updates.checks, 1);
+    await tester.tap(find.text('Check'));
+    await tester.pumpAndSettle();
+    expect(updates.checks, 2);
+  });
+
+  testWidgets('after Later, settings offers the update again', (tester) async {
+    const update = AppUpdate(
+      version: '1.2.0',
+      url: 'https://example.com/a.apk',
+      pageUrl: 'https://example.com/release',
+      size: 32000000,
+      apkName: 'magpie-1.2.0-arm64-v8a.apk',
+    );
+    await pumpApp(tester, updates: _FakeUpdateRepository(update));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Later'));
+    await tester.pumpAndSettle();
+    expect(find.text('Magpie 1.2.0 is available'), findsNothing);
+
+    await openSettings(tester);
+    // Past the row, so it isn't under the navigation bar.
+    await tester.scrollUntilVisible(
+      find.text('Your privacy'),
+      200,
+      scrollable: settingsList,
+    );
+    expect(find.text('Magpie 1.2.0 is ready to install'), findsOneWidget);
+    await tester.tap(find.text('Update now'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Magpie 1.2.0 is available'), findsOneWidget);
+    expect(find.text('Update (32 MB)'), findsOneWidget);
   });
 
   testWidgets('settings says what stays on the phone', (tester) async {

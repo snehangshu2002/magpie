@@ -49,7 +49,8 @@ class UpdateRepositoryImpl implements UpdateRepository {
         for (final asset in release['assets'] as List)
           (asset as Map)['name'] as String: asset,
       };
-      final apk = assets[apkFor(assets.keys, app.abis)];
+      final apkName = apkFor(assets.keys, app.abis);
+      final apk = assets[apkName];
       final page = release['html_url'] as String;
       return Ok(
         AppUpdate(
@@ -57,6 +58,13 @@ class UpdateRepositoryImpl implements UpdateRepository {
           url: apk?['browser_download_url'] as String? ?? page,
           pageUrl: page,
           size: apk?['size'] as int?,
+          apkName: apkName,
+          // "sha256:<hex>", listed for assets uploaded since mid-2025.
+          sha256: switch (apk?['digest']) {
+            final String digest when digest.startsWith('sha256:') =>
+              digest.substring('sha256:'.length),
+            _ => null,
+          },
           notes: releaseNoteLines(release['body'] as String? ?? ''),
           published: DateTime.tryParse(
             release['published_at'] as String? ?? '',
@@ -84,6 +92,57 @@ class UpdateRepositoryImpl implements UpdateRepository {
   @override
   Future<Result<void>> open(String url) =>
       guardPlatformCall(() => _channel.openUrl(url));
+
+  @override
+  Future<Result<String>> download(
+    AppUpdate update, {
+    required void Function(int received, int? total) onProgress,
+    required bool Function() isCancelled,
+  }) async {
+    final name = update.apkName;
+    if (name == null) return const Err(Failure.notFound());
+    final path = await guardPlatformCall(() => _channel.prepareApk(name));
+    if (path case Err(:final failure)) return Err(failure);
+    final file = File(path.getOrThrow());
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15);
+    IOSink? sink;
+    try {
+      // GitHub redirects the asset to its storage host; HttpClient follows.
+      final request = await client.getUrl(Uri.parse(update.url));
+      final response = await request.close().timeout(
+        const Duration(seconds: 30),
+      );
+      if (response.statusCode != HttpStatus.ok) {
+        return Err(Failure.network(detail: 'HTTP ${response.statusCode}'));
+      }
+      final total = response.contentLength > 0
+          ? response.contentLength
+          : update.size;
+      sink = file.openWrite();
+      var received = 0;
+      await for (final chunk in response.timeout(const Duration(seconds: 30))) {
+        if (isCancelled()) return const Err(Failure.cancelled());
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress(received, total);
+      }
+      await sink.close();
+      sink = null;
+      return Ok(file.path);
+    } on IOException catch (e) {
+      return Err(Failure.network(detail: '$e'));
+    } on TimeoutException catch (e) {
+      return Err(Failure.network(detail: '$e'));
+    } finally {
+      await sink?.close();
+      client.close(force: true);
+    }
+  }
+
+  @override
+  Future<Result<void>> install(String path, AppUpdate update) =>
+      guardPlatformCall(() => _channel.installApk(path, sha256: update.sha256));
 }
 
 @Riverpod(keepAlive: true)

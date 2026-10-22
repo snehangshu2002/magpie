@@ -15,6 +15,7 @@ import 'package:media_downloader/features/settings/presentation/settings_provide
 import 'package:media_downloader/features/updater/data/update_repository_impl.dart';
 import 'package:media_downloader/features/updater/domain/app_update.dart';
 import 'package:media_downloader/features/updater/presentation/update_providers.dart';
+import 'package:media_downloader/features/updater/presentation/update_sheet.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 import 'package:simple_icons/simple_icons.dart';
 
@@ -174,7 +175,7 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 28),
                 SectionLabel(l10n.settingsUpdates),
-                const _Group(children: [_AutoUpdateTile()]),
+                const _Group(children: [_AppUpdateTile(), _AutoUpdateTile()]),
                 const SizedBox(height: 28),
                 SectionLabel(l10n.settingsAbout),
                 _Group(
@@ -395,6 +396,78 @@ class _AutoUpdateTile extends ConsumerWidget {
           child: Text(l10n.retry),
         ),
         _ => Icon(Icons.check_circle_rounded, color: scheme.primary),
+      },
+    );
+  }
+}
+
+/// Whether a newer Magpie is out: checks again on tap, and offers the update
+/// (the same sheet as at launch) after "Later".
+class _AppUpdateTile extends ConsumerWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final check = ref.watch(appUpdateProvider);
+    final version = ref.watch(appVersionProvider).value;
+    final buttonStyle = FilledButton.styleFrom(
+      backgroundColor: scheme.primaryContainer,
+      foregroundColor: scheme.onPrimaryContainer,
+    );
+
+    // A newer release found here shows the update sheet (AppShell listens).
+    void checkAgain() {
+      unawaited(HapticFeedback.lightImpact());
+      ref.invalidate(appUpdateProvider);
+    }
+
+    return _SettingTile(
+      icon: Icons.system_update_rounded,
+      title: l10n.settingsAppUpdate,
+      subtitle: switch (check) {
+        AsyncLoading() => l10n.settingsAppUpdateChecking,
+        AsyncData(value: final update?) => l10n.settingsAppUpdateAvailable(
+          update.version,
+        ),
+        AsyncError() => l10n.settingsAppUpdateFailed,
+        _ =>
+          version == null
+              ? l10n.settingsAppUpdateLatest
+              : l10n.settingsAppUpdateCurrent(version),
+      },
+      onTap: check is AsyncLoading ? null : checkAgain,
+      trailing: switch (check) {
+        AsyncLoading() => SizedBox.square(
+          dimension: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: scheme.primary,
+            semanticsLabel: l10n.loading,
+          ),
+        ),
+        AsyncData(value: final update?) => FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.primary,
+            foregroundColor: scheme.onPrimary,
+          ),
+          onPressed: () {
+            unawaited(HapticFeedback.lightImpact());
+            unawaited(showUpdateSheet(context, ref, update));
+          },
+          child: Text(l10n.settingsAppUpdateNow),
+        ),
+        AsyncError() => FilledButton(
+          style: buttonStyle,
+          onPressed: checkAgain,
+          child: Text(l10n.retry),
+        ),
+        _ => FilledButton(
+          style: buttonStyle,
+          onPressed: checkAgain,
+          child: Text(l10n.settingsAppUpdateCheck),
+        ),
       },
     );
   }
