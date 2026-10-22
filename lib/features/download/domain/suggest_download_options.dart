@@ -153,7 +153,7 @@ bool _known(String? codec) => codec != null && codec != 'none';
 
 /// yt-dlp writes `"none"` for a missing stream and leaves the field out when
 /// it doesn't know; a format with a height but no codec info is a video.
-/// Some sites (e.g. Telegram) report just a video file: no codecs, no size.
+/// Some sites report just a video file: no codecs, no size.
 bool _hasVideo(MediaFormat f) =>
     _known(f.vcodec) ||
     (f.vcodec == null && (f.height != null || _videoExts.contains(f.ext)));

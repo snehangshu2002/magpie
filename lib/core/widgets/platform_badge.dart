@@ -12,7 +12,6 @@ extension SourcePlatformBrand on SourcePlatform {
     SourcePlatform.x => SimpleIcons.x,
     SourcePlatform.reddit => SimpleIcons.reddit,
     SourcePlatform.facebook => SimpleIcons.facebook,
-    SourcePlatform.telegram => SimpleIcons.telegram,
     SourcePlatform.other => Icons.public,
   };
 
@@ -23,7 +22,6 @@ extension SourcePlatformBrand on SourcePlatform {
     SourcePlatform.x => SimpleIconColors.x,
     SourcePlatform.reddit => SimpleIconColors.reddit,
     SourcePlatform.facebook => SimpleIconColors.facebook,
-    SourcePlatform.telegram => SimpleIconColors.telegram,
     SourcePlatform.other => null,
   };
 

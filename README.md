@@ -21,7 +21,7 @@
 ---
 
 Magpie is a free and open-source downloader for Android. Share a link from
-YouTube, Instagram, X (Twitter), Facebook, Telegram or
+YouTube, Instagram, X (Twitter), Facebook or
 [hundreds of other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md),
 choose what you want, and Magpie saves it to your phone's `Download` folder,
 where your gallery and file manager can see it.
@@ -56,9 +56,9 @@ No account. No ads. No tracking.
   photos. From a post with several photos or videos, save all of them or
   just the ones you pick.
 - **Best quality**: choose **Best available** to get the highest quality a
-  site offers, even above 4K. Photos from X posts and public Telegram
-  channels are saved at the largest size the site serves, and a direct link
-  to an image saves the full-size file.
+  site offers, even above 4K. Photos from X posts are saved at the largest
+  size the site serves, and a direct link to an image saves the full-size
+  file.
 - **Descriptions and captions**: read a video's description, or the caption
   or text of an Instagram, Facebook or X post, and copy it in one tap.
 - **YouTube transcripts**: read a video's transcript in any of its caption

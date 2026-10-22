@@ -7,10 +7,6 @@ void main() {
     expect(SourcePlatform.fromExtractor('youtube:tab'), SourcePlatform.youtube);
     expect(SourcePlatform.fromExtractor('Instagram'), SourcePlatform.instagram);
     expect(SourcePlatform.fromExtractor('twitter'), SourcePlatform.x);
-    expect(
-      SourcePlatform.fromExtractor('telegram:embed'),
-      SourcePlatform.telegram,
-    );
     expect(SourcePlatform.fromExtractor('generic'), SourcePlatform.other);
   });
 
@@ -18,7 +14,6 @@ void main() {
     expect(SourcePlatform.youtube.folderName, 'YouTube');
     expect(SourcePlatform.youtubeMusic.folderName, 'YouTube');
     expect(SourcePlatform.x.folderName, 'X');
-    expect(SourcePlatform.telegram.folderName, 'Telegram');
     expect(SourcePlatform.other.folderName, 'Other');
   });
 

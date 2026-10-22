@@ -7,7 +7,6 @@ enum SourcePlatform {
   x('X'),
   reddit('Reddit'),
   facebook('Facebook'),
-  telegram('Telegram'),
   other(null);
 
   new(this.brandName);
@@ -44,7 +43,6 @@ enum SourcePlatform {
     if (on('x.com') || on('twitter.com')) return x;
     if (on('reddit.com') || on('redd.it')) return reddit;
     if (on('facebook.com') || on('fb.watch') || on('fb.com')) return facebook;
-    if (h == 't.me' || on('telegram.me') || on('telegram.dog')) return telegram;
     return other;
   }
 
@@ -58,7 +56,6 @@ enum SourcePlatform {
       'twitter' => x,
       'reddit' => reddit,
       'facebook' => facebook,
-      'telegram' => telegram,
       _ => other,
     };
   }

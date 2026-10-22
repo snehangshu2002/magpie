@@ -214,7 +214,7 @@ void main() {
   test('treats a bare video file as video with sound', () {
     final options = _suggest(const [
       MediaFormat(formatId: '0', ext: 'mp4'),
-    ], platform: SourcePlatform.telegram);
+    ], platform: SourcePlatform.other);
 
     expect(options.recommendedType, OutputType.video);
     expect(options.video.single.formatSelector, '0');
