@@ -8,12 +8,13 @@ import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
+import 'package:media_downloader/features/download/presentation/web_image_of.dart';
 import 'package:media_downloader/features/settings/presentation/engine_version_provider.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Thumbnail, title and source of the fetched media.
-class MediaPreviewCard extends StatelessWidget {
+class MediaPreviewCard extends ConsumerWidget {
   const new({
     required this.info,
     required this.platform,
@@ -29,7 +30,7 @@ class MediaPreviewCard extends StatelessWidget {
   final String availability;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -55,14 +56,17 @@ class MediaPreviewCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       ColoredBox(color: scheme.surfaceContainerHighest),
-                      Image.network(
-                        thumbnail,
-                        fit: BoxFit.cover,
+                      Image(
                         // Decode at the card's size, not the source's.
-                        cacheWidth:
-                            (MediaQuery.sizeOf(context).width *
-                                    MediaQuery.devicePixelRatioOf(context))
-                                .round(),
+                        image: webImageOf(
+                          ref,
+                          thumbnail,
+                          cacheWidth:
+                              (MediaQuery.sizeOf(context).width *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                        ),
+                        fit: BoxFit.cover,
                         frameBuilder: (context, child, frame, synchronous) =>
                             synchronous
                             ? child

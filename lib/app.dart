@@ -1,3 +1,4 @@
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/router/app_router.dart';
@@ -26,27 +27,37 @@ class App extends ConsumerWidget {
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     final fontFamily = settings.font.family;
 
-    return MaterialApp.router(
-      onGenerateTitle: (context) => context.l10n.appTitle,
-      theme: AppTheme.light(fontFamily: fontFamily),
-      darkTheme: AppTheme.dark(fontFamily: fontFamily),
-      themeMode: switch (settings.appearance) {
-        AppearanceMode.system => ThemeMode.system,
-        AppearanceMode.light => ThemeMode.light,
-        AppearanceMode.dark => ThemeMode.dark,
-      },
-      themeAnimationCurve: AppMotion.standard,
-      themeAnimationDuration:
-          WidgetsBinding
-              .instance
-              .platformDispatcher
-              .accessibilityFeatures
-              .disableAnimations
-          ? Duration.zero
-          : AppMotion.standard.response,
-      routerConfig: ref.watch(appRouterProvider),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
+    // Wallpaper colours exist on Android 12+; elsewhere both are null.
+    return DynamicColorBuilder(
+      builder: (lightWallpaper, darkWallpaper) => MaterialApp.router(
+        onGenerateTitle: (context) => context.l10n.appTitle,
+        theme: AppTheme.light(
+          fontFamily: fontFamily,
+          wallpaper: settings.wallpaperColors ? lightWallpaper : null,
+        ),
+        darkTheme: AppTheme.dark(
+          fontFamily: fontFamily,
+          wallpaper: settings.wallpaperColors ? darkWallpaper : null,
+          pureBlack: settings.pureBlack,
+        ),
+        themeMode: switch (settings.appearance) {
+          AppearanceMode.system => ThemeMode.system,
+          AppearanceMode.light => ThemeMode.light,
+          AppearanceMode.dark => ThemeMode.dark,
+        },
+        themeAnimationCurve: AppMotion.standard,
+        themeAnimationDuration:
+            WidgetsBinding
+                .instance
+                .platformDispatcher
+                .accessibilityFeatures
+                .disableAnimations
+            ? Duration.zero
+            : AppMotion.standard.response,
+        routerConfig: ref.watch(appRouterProvider),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+      ),
     );
   }
 }

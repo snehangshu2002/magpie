@@ -5,74 +5,93 @@ abstract final class AppTheme {
   static const _seed = Color(0xFF56664F);
 
   /// [fontFamily] is a family from pubspec.yaml; null keeps the phone's font.
-  static ThemeData light({String? fontFamily}) => _build(
-    ColorScheme.fromSeed(
-      seedColor: _seed,
-      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
-    ).copyWith(
-      primary: const Color(0xFF3F4E38),
-      onPrimary: const Color(0xFFFFFFFF),
-      primaryContainer: const Color(0xFF56664F),
-      onPrimaryContainer: const Color(0xFFD1E3C6),
-      secondary: const Color(0xFF53634F),
-      onSecondary: const Color(0xFFFFFFFF),
-      secondaryContainer: const Color(0xFFD7E8CE),
-      onSecondaryContainer: const Color(0xFF596955),
-      tertiary: const Color(0xFF454C42),
-      onTertiary: const Color(0xFFFFFFFF),
-      tertiaryContainer: const Color(0xFF5D6459),
-      onTertiaryContainer: const Color(0xFFDAE0D3),
-      error: const Color(0xFFBA1A1A),
-      onError: const Color(0xFFFFFFFF),
-      errorContainer: const Color(0xFFFFDAD6),
-      onErrorContainer: const Color(0xFF93000A),
-      surface: const Color(0xFFF6FBEF),
-      onSurface: const Color(0xFF181D16),
-      onSurfaceVariant: const Color(0xFF444841),
-      surfaceDim: const Color(0xFFD7DCD1),
-      surfaceBright: const Color(0xFFF6FBEF),
-      surfaceContainerLowest: const Color(0xFFFFFFFF),
-      surfaceContainerLow: const Color(0xFFF1F5EA),
-      surfaceContainer: const Color(0xFFEBF0E4),
-      surfaceContainerHigh: const Color(0xFFE5EADF),
-      surfaceContainerHighest: const Color(0xFFDFE4D9),
-      outline: const Color(0xFF747870),
-      outlineVariant: const Color(0xFFC4C8BE),
-      inverseSurface: const Color(0xFF2D322A),
-      onInverseSurface: const Color(0xFFEEF2E7),
-      inversePrimary: const Color(0xFFBACCB0),
-      surfaceTint: const Color(0xFF53634C),
-    ),
-    fontFamily,
-  );
+  /// [wallpaper] replaces the sage palette with the phone's own colours.
+  static ThemeData light({String? fontFamily, ColorScheme? wallpaper}) =>
+      _build(wallpaper ?? _lightScheme, fontFamily);
 
-  /// Deep peat surfaces with light sage accents.
-  static ThemeData dark({String? fontFamily}) => _build(
-    ColorScheme.fromSeed(
-      seedColor: _seed,
-      brightness: Brightness.dark,
-      dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
-    ).copyWith(
-      primary: const Color(0xFFA9B8A2),
-      onPrimary: const Color(0xFF1F241D),
-      error: const Color(0xFFF2B8B5),
-      errorContainer: const Color(0xFF410E0B),
-      // The next five extend the Stitch peat ladder evenly (same hue family).
-      surfaceDim: const Color(0xFF121511),
-      surfaceBright: const Color(0xFF353B33),
-      surfaceContainerLowest: const Color(0xFF0D100C),
-      surfaceContainerHighest: const Color(0xFF2E352C),
-      outline: const Color(0xFF6E756A),
-      surface: const Color(0xFF121511),
-      onSurface: const Color(0xFFEFEBE2),
-      onSurfaceVariant: const Color(0xFFA3AA9F),
-      surfaceContainerLow: const Color(0xFF181C17),
-      surfaceContainer: const Color(0xFF1C211B),
-      surfaceContainerHigh: const Color(0xFF252C24),
-      outlineVariant: const Color(0xFF2E352C),
-    ),
-    fontFamily,
-  );
+  static final ColorScheme _lightScheme =
+      ColorScheme.fromSeed(
+        seedColor: _seed,
+        dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+      ).copyWith(
+        primary: const Color(0xFF3F4E38),
+        onPrimary: const Color(0xFFFFFFFF),
+        primaryContainer: const Color(0xFF56664F),
+        onPrimaryContainer: const Color(0xFFD1E3C6),
+        secondary: const Color(0xFF53634F),
+        onSecondary: const Color(0xFFFFFFFF),
+        secondaryContainer: const Color(0xFFD7E8CE),
+        onSecondaryContainer: const Color(0xFF596955),
+        tertiary: const Color(0xFF454C42),
+        onTertiary: const Color(0xFFFFFFFF),
+        tertiaryContainer: const Color(0xFF5D6459),
+        onTertiaryContainer: const Color(0xFFDAE0D3),
+        error: const Color(0xFFBA1A1A),
+        onError: const Color(0xFFFFFFFF),
+        errorContainer: const Color(0xFFFFDAD6),
+        onErrorContainer: const Color(0xFF93000A),
+        surface: const Color(0xFFF6FBEF),
+        onSurface: const Color(0xFF181D16),
+        onSurfaceVariant: const Color(0xFF444841),
+        surfaceDim: const Color(0xFFD7DCD1),
+        surfaceBright: const Color(0xFFF6FBEF),
+        surfaceContainerLowest: const Color(0xFFFFFFFF),
+        surfaceContainerLow: const Color(0xFFF1F5EA),
+        surfaceContainer: const Color(0xFFEBF0E4),
+        surfaceContainerHigh: const Color(0xFFE5EADF),
+        surfaceContainerHighest: const Color(0xFFDFE4D9),
+        outline: const Color(0xFF747870),
+        outlineVariant: const Color(0xFFC4C8BE),
+        inverseSurface: const Color(0xFF2D322A),
+        onInverseSurface: const Color(0xFFEEF2E7),
+        inversePrimary: const Color(0xFFBACCB0),
+        surfaceTint: const Color(0xFF53634C),
+      );
+
+  /// Deep peat surfaces with light sage accents; [pureBlack] turns the page
+  /// black, for OLED screens.
+  static ThemeData dark({
+    String? fontFamily,
+    ColorScheme? wallpaper,
+    bool pureBlack = false,
+  }) {
+    final scheme = wallpaper ?? _darkScheme;
+    return _build(
+      pureBlack
+          ? scheme.copyWith(
+              surface: Colors.black,
+              surfaceDim: Colors.black,
+              surfaceContainerLowest: Colors.black,
+            )
+          : scheme,
+      fontFamily,
+    );
+  }
+
+  static final ColorScheme _darkScheme =
+      ColorScheme.fromSeed(
+        seedColor: _seed,
+        brightness: Brightness.dark,
+        dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+      ).copyWith(
+        primary: const Color(0xFFA9B8A2),
+        onPrimary: const Color(0xFF1F241D),
+        error: const Color(0xFFF2B8B5),
+        errorContainer: const Color(0xFF410E0B),
+        // The next five extend the Stitch peat ladder evenly (same hue family).
+        surfaceDim: const Color(0xFF121511),
+        surfaceBright: const Color(0xFF353B33),
+        surfaceContainerLowest: const Color(0xFF0D100C),
+        surfaceContainerHighest: const Color(0xFF2E352C),
+        outline: const Color(0xFF6E756A),
+        surface: const Color(0xFF121511),
+        onSurface: const Color(0xFFEFEBE2),
+        onSurfaceVariant: const Color(0xFFA3AA9F),
+        surfaceContainerLow: const Color(0xFF181C17),
+        surfaceContainer: const Color(0xFF1C211B),
+        surfaceContainerHigh: const Color(0xFF252C24),
+        outlineVariant: const Color(0xFF2E352C),
+      );
 
   /// Continuous corners: the curvature eases into the straight edge instead
   /// of meeting it abruptly, so surfaces read as one smooth shape.

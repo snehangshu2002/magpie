@@ -12,11 +12,12 @@ import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
-import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
+import 'package:media_downloader/features/download/presentation/start_download.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
+import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
@@ -38,9 +39,7 @@ class DownloadBar extends ConsumerWidget {
         ref.watch(selectedDownloadOptionProvider(url)) ??
         preview.options.recommended;
     final starter = ref.watch(downloadStarterProvider(url));
-    final saveFolder = ref.watch(
-      settingsProvider.select((s) => s.value?.saveFolder ?? defaultSaveFolder),
-    );
+    final settings = ref.watch(settingsProvider).value ?? const AppSettings();
 
     ref.listen(downloadStarterProvider(url), (previous, next) {
       final saved = next.value?.state == DownloadState.saved;
@@ -97,7 +96,9 @@ class DownloadBar extends ConsumerWidget {
           when saved.state == DownloadState.saved =>
         _Notice(
           _NoticeKind.saved,
-          l10n.downloadSaved(saveDirFor(saveFolder, preview.platform)),
+          l10n.downloadSaved(
+            DownloadStarter.saveTargetFor(settings, preview, option),
+          ),
           Icons.check_circle_outline_rounded,
           scheme.primary,
           onOpen: saved.filePath == null ? null : () => unawaited(open(saved)),
@@ -203,9 +204,13 @@ class DownloadBar extends ConsumerWidget {
                       onPressed: () {
                         unawaited(HapticFeedback.lightImpact());
                         unawaited(
-                          ref
-                              .read(downloadStarterProvider(url).notifier)
-                              .start(preview, option),
+                          startDownload(
+                            context,
+                            ref,
+                            url: url,
+                            preview: preview,
+                            option: option,
+                          ),
                         );
                       },
                     ),

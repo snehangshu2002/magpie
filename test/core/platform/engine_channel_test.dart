@@ -57,7 +57,10 @@ void main() {
 
     final info = await channel.fetchInfo('https://example.com/video');
 
-    expect(calls.single.arguments, {'url': 'https://example.com/video'});
+    expect(calls.single.arguments, {
+      'url': 'https://example.com/video',
+      'options': <String>[],
+    });
     expect(info.title, 'Test clip');
     expect(info.duration, 42);
     expect(info.formats.map((f) => f.formatId), ['18', '140']);
@@ -88,6 +91,10 @@ void main() {
       'title': 'Test video',
       'items': null,
       'imageUrls': null,
+      'options': <String>[],
+      'playlist': false,
+      'archive': false,
+      'fileName': null,
     });
   });
 

@@ -28,16 +28,44 @@ class Settings extends _$Settings {
     await ref.read(settingsRepositoryProvider).save(next);
   }
 
-  /// Opens the folder picker and saves into the chosen folder from now on.
-  /// Throws the [Failure] when the picker can't be opened.
-  Future<SaveFolderPick> pickSaveFolder() async {
+  /// Opens the folder picker and saves into the chosen folder from now on;
+  /// with [audio], only audio goes there. Throws the [Failure] when the
+  /// picker can't be opened.
+  Future<SaveFolderPick> pickSaveFolder({bool audio = false}) async {
     final picked = (await ref.read(settingsRepositoryProvider).pickFolder())
         .getOrThrow();
     if (picked == null) return SaveFolderPick.cancelled;
     final folder = saveFolderFromTreeId(picked);
     if (folder == null) return SaveFolderPick.outsideDownload;
-    await change((s) => s.copyWith(saveFolder: folder));
+    await change(
+      (s) => audio
+          ? s.copyWith(audioFolder: folder)
+          : s.copyWith(saveFolder: folder),
+    );
     return SaveFolderPick.changed;
+  }
+}
+
+/// Sites the user signed in to, so downloads can use the account.
+@Riverpod(keepAlive: true)
+class SignedInSites extends _$SignedInSites {
+  @override
+  Future<List<String>> build() async =>
+      (await ref.watch(settingsRepositoryProvider).signedInSites())
+          .getOrThrow();
+
+  /// Opens the sign-in page at [url]. Throws the [Failure] when it can't.
+  Future<void> signIn(String url) async {
+    final sites = (await ref.read(settingsRepositoryProvider).signIn(url))
+        .getOrThrow();
+    state = AsyncData(sites);
+  }
+
+  /// Throws the [Failure] when the sign-in couldn't be removed.
+  Future<void> signOut(String site) async {
+    final sites = (await ref.read(settingsRepositoryProvider).signOut(site))
+        .getOrThrow();
+    state = AsyncData(sites);
   }
 }
 

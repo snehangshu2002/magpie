@@ -12,11 +12,12 @@ import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
-import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/download/domain/suggest_download_options.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
+import 'package:media_downloader/features/download/presentation/web_image_of.dart';
 import 'package:media_downloader/features/download/presentation/widgets/media_preview_card.dart';
 import 'package:media_downloader/features/download/presentation/widgets/post_text_card.dart';
+import 'package:media_downloader/features/settings/domain/app_settings.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
@@ -92,9 +93,7 @@ class DownloadPanel extends ConsumerWidget {
     final selected =
         ref.watch(selectedDownloadOptionProvider(url)) ?? options.recommended;
     final expanded = ref.watch(optionsExpandedProvider(url));
-    final saveFolder = ref.watch(
-      settingsProvider.select((s) => s.value?.saveFolder ?? defaultSaveFolder),
-    );
+    final settings = ref.watch(settingsProvider).value ?? const AppSettings();
 
     // The choice is fixed while a download runs.
     final locked = ref.watch(
@@ -110,8 +109,14 @@ class DownloadPanel extends ConsumerWidget {
       ref.read(downloadStarterProvider(url).notifier).dismiss();
     }
 
+    // A playlist's videos are picked on top of the type and quality, so a
+    // listed option is the selected one with the same videos.
+    DownloadOption withPicked(DownloadOption option) => options.playlist
+        ? option.copyWith(items: selected.items, count: selected.count)
+        : option;
+
     final list = options.of(selected.type);
-    final selectedIndex = list.indexOf(selected);
+    final selectedIndex = list.indexWhere((o) => withPicked(o) == selected);
     final canCollapse =
         list.length > _collapsedCount && selectedIndex < _collapsedCount;
     final visible = canCollapse && !expanded
@@ -133,11 +138,13 @@ class DownloadPanel extends ConsumerWidget {
                   duration: shown.duration,
                 ),
           platform: preview.platform,
-          availability:
-              options.recommended.postLabel(l10n) ??
-              l10n.formatsAvailable(
-                [for (final type in options.types) ...options.of(type)].length,
-              ),
+          availability: options.playlist
+              ? l10n.playlistVideos(options.postItems.length)
+              : options.recommended.postLabel(l10n) ??
+                    l10n.formatsAvailable(
+                      [for (final type in options.types) ...options.of(type)]
+                          .length,
+                    ),
         ),
         if (preview.info.description != null ||
             preview.info.captions.isNotEmpty) ...[
@@ -147,8 +154,13 @@ class DownloadPanel extends ConsumerWidget {
         const SizedBox(height: 28),
         if (options.postItems.isNotEmpty) ...[
           _SectionHeader(
-            title: l10n.postPickTitle,
+            title: options.playlist
+                ? l10n.playlistPickTitle
+                : l10n.postPickTitle,
             trailing: switch (picked) {
+              [] when options.playlist => l10n.playlistVideos(
+                options.postItems.length,
+              ),
               [] => options.recommended.postLabel(l10n),
               [final item] => l10n.postPickedItem(
                 item.index,
@@ -175,12 +187,14 @@ class DownloadPanel extends ConsumerWidget {
                               picked.contains(item)
                                   ? picked.where((i) => i != item)
                                   : [...picked, item],
+                              base: selected,
                             ),
                     ),
             ),
           ),
           const SizedBox(height: 16),
-        ] else ...[
+        ],
+        if (options.postItems.isEmpty || options.playlist) ...[
           _SectionHeader(
             title: l10n.saveAs,
             trailing: selected.type.detail(l10n),
@@ -194,7 +208,7 @@ class DownloadPanel extends ConsumerWidget {
                 selected: selected.type,
                 onSelected: locked
                     ? null
-                    : (type) => select(options.defaultFor(type)),
+                    : (type) => select(withPicked(options.defaultFor(type))),
               ),
             ),
             const SizedBox(height: 24),
@@ -224,11 +238,11 @@ class DownloadPanel extends ConsumerWidget {
                         ),
                       _OptionTile(
                         option: option,
-                        selected: option == selected,
+                        selected: withPicked(option) == selected,
                         reason: option == options.recommended
                             ? options.reason.text(l10n, options.maxQuality)
                             : null,
-                        onTap: locked ? null : () => select(option),
+                        onTap: locked ? null : () => select(withPicked(option)),
                       ),
                     ],
                   ],
@@ -263,8 +277,24 @@ class DownloadPanel extends ConsumerWidget {
           ],
           const SizedBox(height: 16),
         ],
+        if (!options.playlist &&
+            options.postItems.isEmpty &&
+            selected.type != OutputType.image &&
+            (preview.info.duration ?? 0) > 1) ...[
+          _Dimmed(
+            dimmed: locked,
+            child: _ClipPicker(
+              url: url,
+              duration: preview.info.duration!,
+              enabled: !locked,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         SectionLabel(l10n.saveDestination),
-        _SaveDestination(path: saveDirFor(saveFolder, preview.platform)),
+        _SaveDestination(
+          path: DownloadStarter.saveTargetFor(settings, preview, selected),
+        ),
       ],
     );
   }
@@ -414,14 +444,14 @@ class _PostItemTile extends StatelessWidget {
 }
 
 /// An item's picture with its number and, for a video, its length.
-class _PostItemThumbnail extends StatelessWidget {
+class _PostItemThumbnail extends ConsumerWidget {
   const new({required this.item, required this.size});
 
   final PostItem item;
   final double size;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final thumbnail = item.thumbnail;
@@ -443,10 +473,14 @@ class _PostItemThumbnail extends StatelessWidget {
         if (thumbnail == null)
           placeholder
         else
-          Image.network(
-            thumbnail,
+          Image(
+            image: webImageOf(
+              ref,
+              thumbnail,
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
+            ),
             fit: BoxFit.cover,
-            cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
             errorBuilder: (_, _, _) => placeholder,
           ),
         Positioned(
@@ -707,7 +741,8 @@ class _OptionTile extends StatelessWidget {
     const tabular = [FontFeature.tabularFigures()];
 
     final title = switch (option.type) {
-      _ when option.count > 1 => option.postLabel(l10n)!,
+      _ when option.count > 1 && !option.playlist => option.postLabel(l10n)!,
+      OutputType.video when quality == bestAvailableQuality => l10n.qualityBest,
       OutputType.video when quality != null => l10n.qualityLabel(quality),
       OutputType.audio => option.type.label(l10n),
       _ => ext ?? option.type.label(l10n),
@@ -850,6 +885,119 @@ class _RecommendedTag extends StatelessWidget {
             color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Save only a part": off saves the whole video; on, a range slider picks
+/// the start and end.
+class _ClipPicker extends ConsumerWidget {
+  const new({required this.url, required this.duration, required this.enabled});
+
+  final Uri url;
+
+  /// Seconds.
+  final int duration;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final clip = ref.watch(clipSelectionProvider(url));
+    final notifier = ref.read(clipSelectionProvider(url).notifier);
+    const tabular = [FontFeature.tabularFigures()];
+
+    void toggle({required bool on}) {
+      unawaited(HapticFeedback.selectionClick());
+      notifier.set(on ? (start: 0, end: duration) : null);
+    }
+
+    return Card(
+      color: scheme.surfaceContainer,
+      child: AnimatedSize(
+        duration: AppMotion.durationOf(context),
+        curve: AppMotion.standard,
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            MergeSemantics(
+              child: InkWell(
+                onTap: enabled ? () => toggle(on: clip == null) : null,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 16, 14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.content_cut_rounded,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.clipTitle,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              clip == null
+                                  ? l10n.clipHint
+                                  : l10n.clipRange(
+                                      formatDuration(clip.start),
+                                      formatDuration(clip.end),
+                                    ),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontFeatures: tabular,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: clip != null,
+                        onChanged: enabled ? (on) => toggle(on: on) : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (clip != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                child: RangeSlider(
+                  values: RangeValues(
+                    clip.start.toDouble(),
+                    clip.end.toDouble(),
+                  ),
+                  max: duration.toDouble(),
+                  // Second steps, but no tick marks on long videos.
+                  divisions: duration <= 300 ? duration : null,
+                  labels: RangeLabels(
+                    formatDuration(clip.start),
+                    formatDuration(clip.end),
+                  ),
+                  onChanged: enabled
+                      ? (values) {
+                          final start = values.start.round();
+                          final end = values.end.round();
+                          // At least a second, or there's nothing to save.
+                          if (end > start) {
+                            notifier.set((start: start, end: end));
+                          }
+                        }
+                      : null,
+                ),
+              ),
+          ],
         ),
       ),
     );

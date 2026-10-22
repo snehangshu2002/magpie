@@ -4,6 +4,9 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.URI
 import java.net.URL
 
 /** The server answered an image request with an error status. */
@@ -24,20 +27,25 @@ internal object ImageFetcher {
     /**
      * Writes the image at [url] to [to]. [onProgress] gets the bytes read so
      * far and the total, when the server says. Stops with [CancelledException]
-     * once [isCancelled] is true.
+     * once [isCancelled] is true. [options] are the job's yt-dlp arguments:
+     * their last `--proxy` and `--user-agent` apply here too.
      */
     fun fetch(
         url: String,
         to: File,
+        options: List<String>,
         isCancelled: () -> Boolean,
         onProgress: (read: Long, total: Long?) -> Unit,
     ) {
-        val connection = URL(url).openConnection() as HttpURLConnection
+        // shortcut: `-4` isn't applied, HttpURLConnection has no DNS hook
+        // (connecting to the IPv4 literal breaks TLS SNI); use a client with
+        // one (OkHttp's Dns) if IPv6-broken networks fail photo downloads.
+        val connection = URL(url).openConnection(proxyOf(valueOf(options, "--proxy"))) as HttpURLConnection
         try {
             connection.connectTimeout = CONNECT_TIMEOUT_MS
             connection.readTimeout = READ_TIMEOUT_MS
             connection.instanceFollowRedirects = true
-            connection.setRequestProperty("User-Agent", USER_AGENT)
+            connection.setRequestProperty("User-Agent", valueOf(options, "--user-agent") ?: USER_AGENT)
             connection.setRequestProperty("Accept", "*/*")
             when (val status = connection.responseCode) {
                 in 200..299 -> Unit
@@ -68,6 +76,21 @@ internal object ImageFetcher {
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun valueOf(options: List<String>, name: String): String? =
+        options.lastIndexOf(name).takeIf { it >= 0 }?.let { options.getOrNull(it + 1) }
+
+    /**
+     * The proxy yt-dlp would use for [url] (`--proxy`); none when unset or
+     * empty. shortcut: proxy credentials aren't sent and an https:// proxy is
+     * spoken to in plain HTTP; add an Authenticator / TLS if users need them.
+     */
+    private fun proxyOf(url: String?): Proxy {
+        val uri = url?.trim()?.takeIf { it.isNotEmpty() }?.let(::URI) ?: return Proxy.NO_PROXY
+        val type = if (uri.scheme.orEmpty().startsWith("socks")) Proxy.Type.SOCKS else Proxy.Type.HTTP
+        val port = uri.port.takeIf { it > 0 } ?: if (type == Proxy.Type.SOCKS) 1080 else 80
+        return Proxy(type, InetSocketAddress.createUnresolved(uri.host, port))
     }
 
     /** A cancel stopped the download. */

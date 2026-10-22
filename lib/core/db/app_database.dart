@@ -32,6 +32,10 @@ class DownloadRecords extends Table {
   TextColumn get fileUri => text().nullable()();
   TextColumn get mimeType => text().nullable()();
   TextColumn get error => text().nullable()();
+
+  /// `<extractor> <id>` of a single video, so "Skip videos already
+  /// downloaded" can tell it is in the Library.
+  TextColumn get videoKey => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get completedAt => dateTime().nullable()();
 
@@ -45,7 +49,12 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'media_downloader'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
+
+  Future<bool> _hasColumn(String table, String column) async {
+    final columns = await customSelect('PRAGMA table_info($table)').get();
+    return columns.any((c) => c.read<String>('name') == column);
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +71,11 @@ class AppDatabase extends _$AppDatabase {
         ]) {
           await m.addColumn(t, column);
         }
+      }
+      // A test build added this column without moving the version to 3,
+      // so it may already be there.
+      if (from < 3 && !await _hasColumn('download_records', 'video_key')) {
+        await m.addColumn(downloadRecords, downloadRecords.videoKey);
       }
     },
   );

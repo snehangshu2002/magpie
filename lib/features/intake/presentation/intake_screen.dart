@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/widgets/page_header.dart';
+import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
+import 'package:media_downloader/features/download/presentation/start_download.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_bar.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
 import 'package:media_downloader/features/download/presentation/widgets/media_preview_card.dart';
@@ -14,6 +16,7 @@ import 'package:media_downloader/features/intake/presentation/intake_controller.
 import 'package:media_downloader/features/intake/presentation/widgets/link_field.dart';
 import 'package:media_downloader/features/intake/presentation/widgets/link_status.dart';
 import 'package:media_downloader/features/intake/presentation/widgets/supported_platforms.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Paste or share a link, see what it is, and pick what to save.
@@ -79,6 +82,29 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
     if (mounted) _commit(() => _controller.pasteFromClipboard(data?.text));
   }
 
+  Future<void> _downloadRightAway(Uri url, MediaPreview preview) async {
+    // The Download bar, which follows the download, isn't built yet; without
+    // a listener the starter would be disposed mid-start and lose it.
+    final keep = ref.listenManual(downloadStarterProvider(url), (_, _) {});
+    try {
+      final settings = await ref.read(settingsProvider.future);
+      final idle = ref.read(downloadStarterProvider(url)).value == null;
+      if (!settings.downloadRightAway || !idle || !mounted) return;
+      await startDownload(
+        context,
+        ref,
+        url: url,
+        preview: preview,
+        option:
+            ref.read(selectedDownloadOptionProvider(url)) ??
+            preview.options.recommended,
+      );
+    } finally {
+      // Let go once the bar, built in the next frame, listens instead.
+      WidgetsBinding.instance.addPostFrameCallback((_) => keep.close());
+    }
+  }
+
   /// Outgoing children stay in the stack while they fade; they must not
   /// take taps.
   static Widget _layout(Widget? current, List<Widget> previous) => Stack(
@@ -94,10 +120,23 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
     final l10n = context.l10n;
     final state = ref.watch(intakeControllerProvider);
     final submitted = state.submitted;
-    final preview = submitted == null
+    final previewProvider = submitted == null
         ? null
-        : ref.watch(mediaPreviewProvider(submitted.uri, submitted.platform));
+        : submitted.kind == LinkKind.playlist
+        ? playlistPreviewProvider(submitted.uri, submitted.platform)
+        : mediaPreviewProvider(submitted.uri, submitted.platform);
+    final preview = previewProvider == null ? null : ref.watch(previewProvider);
     final duration = AppMotion.durationOf(context);
+
+    // "Download right away": start the suggested choice once the link is read.
+    if (previewProvider != null) {
+      ref.listen(previewProvider, (previous, next) {
+        if (next case AsyncData(:final value, isLoading: false)
+            when previous?.value == null) {
+          unawaited(_downloadRightAway(submitted!.uri, value));
+        }
+      });
+    }
 
     // Paste and Share change the text from outside the field.
     ref
@@ -144,8 +183,7 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
         AsyncError(:final error) => PreviewError(
           key: ValueKey(('error', url)),
           error: error,
-          onRetry: () =>
-              ref.invalidate(mediaPreviewProvider(url, submitted.platform)),
+          onRetry: () => ref.invalidate(previewProvider!),
         ),
       };
     }
@@ -213,12 +251,10 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                       focusNode: _focus,
                       platform: state.detected?.platform,
                       hasText: state.input.isNotEmpty,
-                      // Nothing to fetch for a playlist (the status explains
-                      // why) or for a link whose formats already show.
+                      // Nothing to fetch for a link whose formats already show.
                       canSubmit:
-                          state.detected?.kind != LinkKind.playlist &&
-                          (submitted == null ||
-                              state.detected?.uri != submitted.uri),
+                          submitted == null ||
+                          state.detected?.uri != submitted.uri,
                       onChanged: _controller.edit,
                       onSubmit: () => _commit(_controller.submit),
                       onPaste: _paste,

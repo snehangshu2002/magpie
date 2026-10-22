@@ -15,6 +15,7 @@ abstract final class NativeErrorCode {
   static const noApp = 'NO_APP';
   static const tooLarge = 'TOO_LARGE';
   static const encode = 'ENCODE';
+  static const nothingNew = 'NOTHING_NEW';
 }
 
 Failure failureFromPlatformException(PlatformException e) =>
@@ -32,6 +33,7 @@ Failure failureFromNativeCode(String? code, [String? detail]) => switch (code) {
   NativeErrorCode.noApp => Failure.noApp(detail: detail),
   NativeErrorCode.tooLarge => Failure.tooLarge(detail: detail),
   NativeErrorCode.encode => Failure.encode(detail: detail),
+  NativeErrorCode.nothingNew => const Failure.nothingNew(),
   _ => Failure.unknown(detail: '$code: $detail'),
 };
 

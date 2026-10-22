@@ -8,7 +8,7 @@ part 'intake_controller.freezed.dart';
 part 'intake_controller.g.dart';
 
 /// A problem with what the user entered, shown under the link box.
-enum IntakeNotice { invalidLink, clipboardEmpty, playlistUnsupported }
+enum IntakeNotice { invalidLink, clipboardEmpty }
 
 @freezed
 abstract class IntakeState with _$IntakeState {
@@ -61,8 +61,6 @@ class IntakeController extends _$IntakeController {
       if (state.input.trim().isNotEmpty) {
         state = state.copyWith(notice: IntakeNotice.invalidLink);
       }
-    } else if (detected.kind == LinkKind.playlist) {
-      state = state.copyWith(notice: IntakeNotice.playlistUnsupported);
     } else {
       state = state.copyWith(submitted: detected, notice: null);
     }

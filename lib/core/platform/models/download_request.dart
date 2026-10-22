@@ -27,6 +27,20 @@ abstract class DownloadRequest with _$DownloadRequest {
 
     /// Full-size photos an `images` download saves, in order.
     List<String>? imageUrls,
+
+    /// Extra yt-dlp arguments from Settings (`downloadArgs`).
+    @Default(<String>[]) List<String> options,
+
+    /// Saves the playlist at [url]; [items] picks some of its videos.
+    @Default(false) bool playlist,
+
+    /// Leaves out videos saved before (`NOTHING_NEW` if there's nothing
+    /// else to save).
+    @Default(false) bool archive,
+
+    /// yt-dlp output template for the file name, without the extension;
+    /// null for the title.
+    String? fileName,
   }) = _DownloadRequest;
 
   factory fromJson(Map<String, dynamic> json) =>

@@ -1,5 +1,7 @@
 import 'package:media_downloader/core/platform/models/media_info.dart';
 import 'package:media_downloader/features/download/data/media_repository_impl.dart';
+import 'package:media_downloader/features/download/domain/download_args.dart';
+import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'post_text_providers.g.dart';
@@ -27,6 +29,10 @@ class SelectedCaption extends _$SelectedCaption {
 
 /// The words of caption [track] of [url], as plain text.
 @riverpod
-Future<String> transcript(Ref ref, Uri url, CaptionTrack track) async =>
-    (await ref.watch(mediaRepositoryProvider).fetchTranscript(url, track))
-        .getOrThrow();
+Future<String> transcript(Ref ref, Uri url, CaptionTrack track) async {
+  final settings = await ref.read(settingsProvider.future);
+  return (await ref
+          .watch(mediaRepositoryProvider)
+          .fetchTranscript(url, track, options: networkArgs(settings)))
+      .getOrThrow();
+}

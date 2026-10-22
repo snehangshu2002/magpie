@@ -22,7 +22,6 @@ extension IntakeNoticeMessage on IntakeNotice {
   String message(AppLocalizations l10n) => switch (this) {
     IntakeNotice.invalidLink => l10n.noticeInvalidLink,
     IntakeNotice.clipboardEmpty => l10n.noticeClipboardEmpty,
-    IntakeNotice.playlistUnsupported => l10n.noticePlaylistUnsupported,
   };
 }
 
@@ -63,12 +62,6 @@ class LinkStatus extends StatelessWidget {
       (final IntakeNotice active, _) => (
         Icons.warning_amber_rounded,
         active.message(l10n),
-        scheme.tertiary,
-        true,
-      ),
-      (_, DetectedLink(kind: LinkKind.playlist)) => (
-        Icons.warning_amber_rounded,
-        l10n.noticePlaylistUnsupported,
         scheme.tertiary,
         true,
       ),
