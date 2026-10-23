@@ -1,0 +1,6 @@
+- Save whole playlists, trimmed clips, and what your signed-in account can see
+- Six colour palettes, wallpaper colours and pure black
+- Audio formats, a separate audio folder and cover art
+- Embed subtitles and details, skip sponsor segments, save as MKV
+- Speed limit, parallel pieces, proxy, IPv4 only and extra yt-dlp options
+- Fixed: Open after downloading works on HyperOS

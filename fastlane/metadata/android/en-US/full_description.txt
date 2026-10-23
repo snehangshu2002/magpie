@@ -1,0 +1,41 @@
+<p>Magpie is a free and open-source downloader for Android. Share a link from YouTube, Instagram, X (Twitter), Facebook or hundreds of other sites, choose what you want, and Magpie saves it to your phone's <i>Download</i> folder, where your gallery and file manager can see it.</p>
+
+<p>No account. No ads. No tracking.</p>
+
+<b>Downloading</b>
+<ul>
+<li><b>Share or paste</b> a link from any app, or start the suggested download as soon as a link is read.</li>
+<li><b>Pick what you want</b>: video in the quality you choose, audio only, or photos. From a post with several photos or videos, save all of them or just some.</li>
+<li><b>Best quality</b>, even above 4K, and full-size photos.</li>
+<li><b>Playlists</b>: save a whole playlist or choose videos, skipping ones you already have.</li>
+<li><b>Save only a part</b> of a video.</li>
+<li><b>Sign in to sites</b> to download what your own account can see. The sign-in stays on your phone.</li>
+<li><b>Background downloads</b> with a progress notification, and an optional question before using mobile data.</li>
+</ul>
+
+<b>Saved files</b>
+<ul>
+<li>Keep the original audio or convert it to MP3, M4A or Opus, with cover art.</li>
+<li>Title, channel and date saved inside the file.</li>
+<li>Embed subtitles or automatic captions.</li>
+<li>Skip sponsored segments in YouTube videos with SponsorBlock.</li>
+<li>Make a smaller copy of a video to send in a chat app.</li>
+<li>Tidy folders: <i>Download/Magpie/&lt;Site&gt;/</i> or a folder of your choice.</li>
+</ul>
+
+<b>Reading</b>
+<ul>
+<li>Read and copy a video's description or a post's caption.</li>
+<li>Read, copy or save YouTube transcripts in any caption language.</li>
+</ul>
+
+<b>Library and app</b>
+<ul>
+<li>Search, filter, open, share or delete what you've saved, or turn off the history.</li>
+<li>The download engine (yt-dlp) updates itself, so sites keep working as they change.</li>
+<li>Light, dark or system theme, six colour palettes or your wallpaper's colours, a pure black theme and a choice of fonts.</li>
+<li>Advanced: speed limit, downloading in pieces, proxy (HTTP or SOCKS), IPv4 only, browser identity, file name templates and extra yt-dlp options.</li>
+</ul>
+
+<b>Privacy</b>
+<p>Magpie collects nothing about you. It connects only to the sites whose links you give it, to GitHub to update its download engine, to SponsorBlock if you turn it on, and to your proxy if you set one.</p>

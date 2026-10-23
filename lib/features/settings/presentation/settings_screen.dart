@@ -463,7 +463,12 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 28),
                 SectionLabel(l10n.settingsUpdates),
-                const _Group(children: [_AppUpdateTile(), _AutoUpdateTile()]),
+                const _Group(
+                  children: [
+                    if (selfUpdate) _AppUpdateTile(),
+                    _AutoUpdateTile(),
+                  ],
+                ),
                 const SizedBox(height: 28),
                 SectionLabel(l10n.settingsAbout),
                 _Group(

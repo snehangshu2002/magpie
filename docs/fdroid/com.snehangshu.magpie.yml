@@ -1,0 +1,126 @@
+Categories:
+  - Download
+License: MIT
+AuthorName: Snehangshu
+SourceCode: https://github.com/snehangshu2002/magpie
+IssueTracker: https://github.com/snehangshu2002/magpie/issues
+Changelog: https://github.com/snehangshu2002/magpie/releases
+
+AutoName: Magpie
+
+RepoType: git
+Repo: https://github.com/snehangshu2002/magpie.git
+
+AntiFeatures:
+  NonFreeNet:
+    en-US: Downloads yt-dlp updates from GitHub.
+
+Builds:
+  - versionName: 1.2.1
+    versionCode: 1004
+    commit: v1.2.1
+    output: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+    srclibs:
+      - flutter@stable
+    prebuild:
+      - flutterVersion=$(sed -n -E "s/.*flutter-version:\ '(.*)'/\1/p" .github/workflows/release.yml)
+      - '[[ $flutterVersion ]]'
+      - git -C $$flutter$$ checkout -f $flutterVersion
+      - sed -i -e '/buildTypes {/,/^    }/d' android/app/build.gradle.kts
+      - sed -i -e '/REQUEST_INSTALL_PACKAGES/d' android/app/src/main/AndroidManifest.xml
+      - curl -Lo sqlite.zip https://sqlite.org/2026/sqlite-amalgamation-3540100.zip
+      - python3 -c "import hashlib, sys; sys.exit(hashlib.sha3_256(open('sqlite.zip',
+        'rb').read()).hexdigest() != '92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30')"
+      - unzip -j sqlite.zip '*/sqlite3.c' -d third_party/sqlite
+      - rm sqlite.zip
+      - 'printf ''\nhooks:\n  user_defines:\n    sqlite3:\n      source: source\n      path: third_party/sqlite/sqlite3.c\n''
+        >> pubspec.yaml'
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get --enforce-lockfile
+      - $$flutter$$/bin/dart run build_runner build
+    scanignore:
+      - .flutter/bin/cache
+    scandelete:
+      - .pub-cache
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform=android-arm
+        --dart-define=SELF_UPDATE=false
+    ndk: r28c
+
+  - versionName: 1.2.1
+    versionCode: 2004
+    commit: v1.2.1
+    output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+    srclibs:
+      - flutter@stable
+    prebuild:
+      - flutterVersion=$(sed -n -E "s/.*flutter-version:\ '(.*)'/\1/p" .github/workflows/release.yml)
+      - '[[ $flutterVersion ]]'
+      - git -C $$flutter$$ checkout -f $flutterVersion
+      - sed -i -e '/buildTypes {/,/^    }/d' android/app/build.gradle.kts
+      - sed -i -e '/REQUEST_INSTALL_PACKAGES/d' android/app/src/main/AndroidManifest.xml
+      - curl -Lo sqlite.zip https://sqlite.org/2026/sqlite-amalgamation-3540100.zip
+      - python3 -c "import hashlib, sys; sys.exit(hashlib.sha3_256(open('sqlite.zip',
+        'rb').read()).hexdigest() != '92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30')"
+      - unzip -j sqlite.zip '*/sqlite3.c' -d third_party/sqlite
+      - rm sqlite.zip
+      - 'printf ''\nhooks:\n  user_defines:\n    sqlite3:\n      source: source\n      path: third_party/sqlite/sqlite3.c\n''
+        >> pubspec.yaml'
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get --enforce-lockfile
+      - $$flutter$$/bin/dart run build_runner build
+    scanignore:
+      - .flutter/bin/cache
+    scandelete:
+      - .pub-cache
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform=android-arm64
+        --dart-define=SELF_UPDATE=false
+    ndk: r28c
+
+  - versionName: 1.2.1
+    versionCode: 4004
+    commit: v1.2.1
+    output: build/app/outputs/flutter-apk/app-x86_64-release.apk
+    srclibs:
+      - flutter@stable
+    prebuild:
+      - flutterVersion=$(sed -n -E "s/.*flutter-version:\ '(.*)'/\1/p" .github/workflows/release.yml)
+      - '[[ $flutterVersion ]]'
+      - git -C $$flutter$$ checkout -f $flutterVersion
+      - sed -i -e '/buildTypes {/,/^    }/d' android/app/build.gradle.kts
+      - sed -i -e '/REQUEST_INSTALL_PACKAGES/d' android/app/src/main/AndroidManifest.xml
+      - curl -Lo sqlite.zip https://sqlite.org/2026/sqlite-amalgamation-3540100.zip
+      - python3 -c "import hashlib, sys; sys.exit(hashlib.sha3_256(open('sqlite.zip',
+        'rb').read()).hexdigest() != '92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30')"
+      - unzip -j sqlite.zip '*/sqlite3.c' -d third_party/sqlite
+      - rm sqlite.zip
+      - 'printf ''\nhooks:\n  user_defines:\n    sqlite3:\n      source: source\n      path: third_party/sqlite/sqlite3.c\n''
+        >> pubspec.yaml'
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get --enforce-lockfile
+      - $$flutter$$/bin/dart run build_runner build
+    scanignore:
+      - .flutter/bin/cache
+    scandelete:
+      - .pub-cache
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi --target-platform=android-x64
+        --dart-define=SELF_UPDATE=false
+    ndk: r28c
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+VercodeOperation:
+  - '%c + 1000'
+  - '%c + 2000'
+  - '%c + 4000'
+UpdateCheckData: pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+
+CurrentVersion: 1.2.1
+CurrentVersionCode: 4004

@@ -8,10 +8,16 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'update_providers.g.dart';
 
+/// False in builds that an app store updates (F-Droid builds with
+/// `--dart-define=SELF_UPDATE=false`). The store signs them with its own
+/// key, so a GitHub APK would not install over them.
+const selfUpdate = bool.fromEnvironment('SELF_UPDATE', defaultValue: true);
+
 /// A newer release of the app, checked once per launch; null when up to
 /// date. Failures are not shown: the next launch checks again.
 @Riverpod(keepAlive: true)
 Future<AppUpdate?> appUpdate(Ref ref) async {
+  if (!selfUpdate) return null;
   final settings = await ref.read(settingsProvider.future);
   return (await ref
           .watch(updateRepositoryProvider)

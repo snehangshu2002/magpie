@@ -10,7 +10,8 @@ and saves them straight to the device's shared storage (visible in the file
 manager and gallery).
 
 - **Platform:** Android only (no iOS, no Play Store)
-- **Distribution:** GitHub Releases (signed APKs); F-Droid later
+- **Distribution:** GitHub Releases (signed APKs) and F-Droid (built and
+  signed by F-Droid from tags; recipe and guide in `docs/fdroid/`)
 - **License:** MIT (`LICENSE`) for this repo's code. The APK bundles
   youtubedl-android (GPL-3.0), so the built app as a whole falls under GPL-3.0
   terms: keep the source public and don't add GPL-incompatible dependencies
@@ -339,6 +340,9 @@ browser. The "Release notes" chip opens the release page. Settings →
 Updates has a "Magpie updates" row (`_AppUpdateTile`): up to date + Check
 (re-runs `appUpdateProvider`, so a find shows the sheet), or after "Later"
 "Magpie <version> is ready to install" + Update now (the same sheet).
+Builds with `--dart-define=SELF_UPDATE=false` (F-Droid) have no self-update:
+`selfUpdate` (`update_providers.dart`) makes `appUpdateProvider` return null
+and hides `_AppUpdateTile`.
 
 Native methods initialize yt-dlp lazily, so `init` is only needed to warm up
 and read the version. youtubedl-android records a version only when
@@ -479,6 +483,14 @@ lists under "What's new"; without notes it shows only the version and size. It n
 `KEYSTORE_BASE64` (`base64 -w0 release.jks`), `KEYSTORE_PASSWORD`,
 `KEY_ALIAS`, `KEY_PASSWORD`, and fails without them rather than publish a
 debug-signed APK.
+
+F-Droid builds each `v*` tag itself with the recipe in
+`docs/fdroid/com.snehangshu.magpie.yml` (the copy that's used lives in
+fdroiddata). It reads the version from `pubspec.yaml`, so bump `+N` on every
+release even though the workflow ignores it. Rewrite
+`fastlane/metadata/android/en-US/changelogs/default.txt` too. The recipe
+builds without the self-updater, compiles SQLite from source and leaves the
+APK unsigned; `docs/fdroid/README.md` explains why.
 
 ## Code navigation (knowledge graph)
 
