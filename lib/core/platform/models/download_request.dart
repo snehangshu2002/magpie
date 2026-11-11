@@ -3,7 +3,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'download_request.freezed.dart';
 part 'download_request.g.dart';
 
-enum OutputType { video, audio, image }
+/// [document] is a PDF made by a PDF tool; nothing downloads as one.
+enum OutputType { video, audio, image, document }
 
 /// Arguments of `startDownload`.
 @freezed

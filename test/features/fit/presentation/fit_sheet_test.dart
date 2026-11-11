@@ -11,6 +11,7 @@ import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/fit/data/fit_repository_impl.dart';
 import 'package:media_downloader/features/fit/domain/fit_plan.dart';
 import 'package:media_downloader/features/fit/domain/fit_repository.dart';
+import 'package:media_downloader/features/fit/domain/video_tool.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/presentation/library_screen.dart';
@@ -57,6 +58,15 @@ class _FakeFitRepository implements FitRepository {
     started.add((size: size, plan: plan, name: name));
     return Ok(id);
   }
+
+  @override
+  Future<Result<String>> startTool({
+    required String id,
+    required LibraryItem item,
+    required VideoJob job,
+    required String targetDir,
+    required String name,
+  }) async => Ok(id);
 
   @override
   Stream<DownloadProgress> progressOf(String id) => progress.stream;

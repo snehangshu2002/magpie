@@ -10,3 +10,7 @@
 # class" at startup when R8 strips their constructors).
 -keep class org.apache.commons.compress.** { *; }
 -dontwarn org.apache.commons.compress.**
+
+# pdfbox-android (storage/PdfEditor.kt). Its optional JPEG 2000 decoder isn't
+# included, so JPX pictures are skipped rather than read.
+-dontwarn com.gemalto.jp2.**

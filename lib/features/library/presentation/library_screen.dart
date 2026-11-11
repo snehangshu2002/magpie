@@ -10,16 +10,21 @@ import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/router/app_router.dart';
 import 'package:media_downloader/core/theme/motion.dart';
+import 'package:media_downloader/core/utils/formatters.dart';
 import 'package:media_downloader/core/widgets/page_header.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/presentation/widgets/download_panel.dart';
+import 'package:media_downloader/features/image_edit/presentation/image_edit_sheet.dart';
 import 'package:media_downloader/features/library/domain/library_filter.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
+import 'package:media_downloader/features/library/domain/library_view.dart';
 import 'package:media_downloader/features/library/presentation/library_actions.dart';
 import 'package:media_downloader/features/library/presentation/library_providers.dart';
 import 'package:media_downloader/features/library/presentation/widgets/active_download_tile.dart';
 import 'package:media_downloader/features/library/presentation/widgets/library_tile.dart';
+import 'package:media_downloader/features/pdf/domain/pdf_tool.dart';
+import 'package:media_downloader/features/pdf/presentation/pdf_tool_sheet.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Downloads in progress, then everything saved, newest first and grouped
@@ -34,7 +39,10 @@ class LibraryScreen extends ConsumerWidget {
     final active = ref.watch(activeDownloadsProvider).value ?? const [];
     final filter = ref.watch(libraryFilterStateProvider);
     final list = items.value;
-    final shown = list?.where(filter.matches).toList();
+    final view = ref.watch(libraryViewProvider);
+    final shown = list == null
+        ? null
+        : sortLibrary(list.where(filter.matches).toList(), view.sort);
     final selection = ref.watch(librarySelectionProvider);
     // Ids of files deleted meanwhile drop out here.
     final selected = [...?shown?.where((item) => selection.contains(item.id))];
@@ -117,19 +125,47 @@ class LibraryScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-              for (final (day, group) in _byDay(shown)) ...[
-                SectionLabel(_dayLabel(context, day)),
-                for (final item in group)
-                  _Appear(
-                    key: ValueKey(item.id),
-                    id: item.id,
-                    // Only files that just finished; the rest are already
-                    // there when the screen opens or scrolls back.
-                    animate:
-                        DateTime.now().difference(item.savedAt) <
-                        const Duration(seconds: 5),
-                    child: LibraryTile(item: item, selecting: selecting),
-                  ),
+              if (!filter.searching && !selecting && list.length > 1)
+                _StorageCard(items: list),
+              // Sorted by size or name there are no days to split by.
+              for (final (day, group)
+                  in view.sort.byDate
+                      ? _byDay(shown)
+                      : [if (shown.isNotEmpty) (null, shown)]) ...[
+                if (day != null) SectionLabel(_dayLabel(context, day)),
+                if (view.grid)
+                  GridView.builder(
+                    shrinkWrap: true,
+                    // Scrolls with the page around it.
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 220,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 0.95,
+                        ),
+                    itemCount: group.length,
+                    itemBuilder: (context, i) => LibraryTile(
+                      key: ValueKey(group[i].id),
+                      item: group[i],
+                      selecting: selecting,
+                      grid: true,
+                    ),
+                  )
+                else
+                  for (final item in group)
+                    _Appear(
+                      key: ValueKey(item.id),
+                      id: item.id,
+                      // Only files that just finished; the rest are already
+                      // there when the screen opens or scrolls back.
+                      animate:
+                          DateTime.now().difference(item.savedAt) <
+                          const Duration(seconds: 5),
+                      child: LibraryTile(item: item, selecting: selecting),
+                    ),
                 const SizedBox(height: 18),
               ],
             ],
@@ -171,6 +207,40 @@ class LibraryScreen extends ConsumerWidget {
                           .read(libraryFilterStateProvider.notifier)
                           .openSearch,
                     ),
+                  if (list?.isNotEmpty ?? false) ...[
+                    PopupMenuButton<LibrarySort>(
+                      tooltip: l10n.librarySort,
+                      icon: const Icon(Icons.sort_rounded),
+                      initialValue: view.sort,
+                      onSelected: ref.read(libraryViewProvider.notifier).sortBy,
+                      itemBuilder: (context) => [
+                        for (final sort in LibrarySort.values)
+                          PopupMenuItem(
+                            value: sort,
+                            child: Text(switch (sort) {
+                              LibrarySort.newest => l10n.librarySortNewest,
+                              LibrarySort.oldest => l10n.librarySortOldest,
+                              LibrarySort.largest => l10n.librarySortLargest,
+                              LibrarySort.name => l10n.librarySortName,
+                            }),
+                          ),
+                      ],
+                    ),
+                    IconButton(
+                      tooltip: view.grid
+                          ? l10n.libraryShowList
+                          : l10n.libraryShowGrid,
+                      icon: Icon(
+                        view.grid
+                            ? Icons.view_agenda_outlined
+                            : Icons.grid_view_rounded,
+                      ),
+                      onPressed: () {
+                        unawaited(HapticFeedback.selectionClick());
+                        ref.read(libraryViewProvider.notifier).toggleGrid();
+                      },
+                    ),
+                  ],
                   SizedBox(width: side - 8),
                 ],
               ),
@@ -192,8 +262,8 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   /// Items grouped by the day they were saved; [items] are newest first.
-  static List<(DateTime, List<LibraryItem>)> _byDay(List<LibraryItem> items) {
-    final groups = <(DateTime, List<LibraryItem>)>[];
+  static List<(DateTime?, List<LibraryItem>)> _byDay(List<LibraryItem> items) {
+    final groups = <(DateTime?, List<LibraryItem>)>[];
     for (final item in items) {
       final at = item.savedAt;
       final day = DateTime(at.year, at.month, at.day);
@@ -256,6 +326,42 @@ class _SelectionBar extends ConsumerWidget {
               selection.selectAll([for (final item in shown) item.id]);
             },
           ),
+        if (selected.every((item) => item.type == OutputType.image))
+          IconButton(
+            tooltip: l10n.libraryEditImages,
+            icon: const Icon(Icons.photo_size_select_large_rounded),
+            onPressed: () async {
+              await showImageEditSheet(context, selected);
+              selection.clear();
+            },
+          ),
+        if (selected.every((item) => item.type == OutputType.image))
+          IconButton(
+            tooltip: l10n.libraryMakePdf,
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () async {
+              await showPdfToolSheet(
+                context,
+                tool: PdfTool.fromImages,
+                items: selected,
+              );
+              selection.clear();
+            },
+          ),
+        if (selected.length > 1 &&
+            selected.every((item) => item.type == OutputType.document))
+          IconButton(
+            tooltip: l10n.libraryMerge,
+            icon: const Icon(Icons.merge_type_rounded),
+            onPressed: () async {
+              await showPdfToolSheet(
+                context,
+                tool: PdfTool.merge,
+                items: selected,
+              );
+              selection.clear();
+            },
+          ),
         IconButton(
           tooltip: l10n.libraryShare,
           icon: const Icon(Icons.share_outlined),
@@ -276,6 +382,112 @@ class _SelectionBar extends ConsumerWidget {
         ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+}
+
+/// How much space the saved files take, split by site.
+class _StorageCard extends StatelessWidget {
+  const new({required this.items});
+
+  final List<LibraryItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final sites = storageBySite(items);
+    if (sites.isEmpty) return const SizedBox.shrink();
+    final total = sites.fold(0, (sum, site) => sum + site.$2);
+    final tones = [
+      scheme.primary,
+      scheme.tertiary,
+      scheme.secondary,
+      scheme.outline,
+    ];
+    Color tone(int i) => tones[i.clamp(0, tones.length - 1)];
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 20),
+      color: scheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  formatByteSize(total, l10n),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.libraryStorageFiles(items.length),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipPath(
+              clipper: const ShapeBorderClipper(shape: StadiumBorder()),
+              child: SizedBox(
+                height: 8,
+                child: Row(
+                  children: [
+                    for (final (i, site) in sites.indexed)
+                      Expanded(
+                        // At least a sliver, so a small site still shows.
+                        flex: (site.$2 * 1000 ~/ total).clamp(8, 1000),
+                        child: ColoredBox(color: tone(i)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 16,
+              runSpacing: 6,
+              children: [
+                for (final (i, site) in sites.indexed)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: tone(i),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${site.$1.label(l10n)} '
+                        '${formatByteSize(site.$2, l10n)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

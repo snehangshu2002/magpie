@@ -281,6 +281,18 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
+    // Below the tools now; it ends the page.
+    await tester.scrollUntilVisible(
+      find.byType(ShareTip),
+      300,
+      scrollable: find
+          .ancestor(
+            of: find.byType(TextField),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
     final tip = tester.getRect(find.byType(ShareTip));
     final nav = tester.getRect(find.byType(NavigationBar));
     expect(tip.height, lessThan(200));

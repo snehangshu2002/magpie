@@ -95,6 +95,8 @@ extension DownloadOptionsX on DownloadOptions {
     OutputType.video => video,
     OutputType.audio => audio,
     OutputType.image => image,
+    // Nothing downloads as a PDF.
+    OutputType.document => const [],
   };
 
   /// Output types this media offers, in display order.

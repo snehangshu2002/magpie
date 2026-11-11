@@ -3,12 +3,14 @@ import 'package:media_downloader/core/router/app_shell.dart';
 import 'package:media_downloader/features/intake/presentation/intake_screen.dart';
 import 'package:media_downloader/features/library/presentation/library_screen.dart';
 import 'package:media_downloader/features/settings/presentation/settings_screen.dart';
+import 'package:media_downloader/features/tools/presentation/tools_screen.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'app_router.g.dart';
 
 abstract final class AppRoutes {
   static const intake = '/';
+  static const tools = '/tools';
   static const library = '/library';
   static const settings = '/settings';
 }
@@ -34,6 +36,15 @@ GoRouter appRouter(Ref ref) {
             ],
           ),
           // Preloaded, so a swipe reveals the page instead of a blank one.
+          StatefulShellBranch(
+            preload: true,
+            routes: [
+              GoRoute(
+                path: AppRoutes.tools,
+                builder: (context, state) => const ToolsScreen(),
+              ),
+            ],
+          ),
           StatefulShellBranch(
             preload: true,
             routes: [

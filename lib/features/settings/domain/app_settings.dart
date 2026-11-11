@@ -16,10 +16,12 @@ enum AppFont {
   final String? family;
 }
 
-/// The app's colours: [sage] is the designed palette; the others grow a
+/// The app's colours: [indigo] is the designed palette; the others grow a
 /// Material scheme from [seed] (ARGB).
 enum ThemeColor {
-  sage(null),
+  /// The app's own palette (`AppTheme`); a stored `sage` from before
+  /// reads as this.
+  indigo(null),
   sea(0xFF3A6D8C),
   pine(0xFF2F6B57),
   lavender(0xFF6B5B95),
@@ -41,7 +43,7 @@ final class AppSettings {
     this.preferAudioForMusic = true,
     this.appearance = AppearanceMode.system,
     this.font = AppFont.system,
-    this.themeColor = ThemeColor.sage,
+    this.themeColor = ThemeColor.indigo,
     this.saveFolder = defaultSaveFolder,
     this.audioFolder = '',
     this.wallpaperColors = false,
@@ -108,7 +110,7 @@ final class AppSettings {
   /// Folder for audio downloads; empty means [saveFolder].
   final String audioFolder;
 
-  /// Colours from the wallpaper (Android 12+) instead of the sage palette.
+  /// Colours from the wallpaper (Android 12+) instead of the indigo palette.
   final bool wallpaperColors;
 
   /// Black backgrounds in the dark theme.

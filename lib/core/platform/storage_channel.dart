@@ -80,6 +80,98 @@ class StorageChannel {
     'targetDir': targetDir,
   }))!;
 
+  /// Opens Android's picker for [mimeType] files (`image/*`,
+  /// `application/pdf`); the content URIs picked, none if the user backed
+  /// out.
+  Future<List<String>> pickFiles(
+    String mimeType, {
+    bool multiple = false,
+  }) async =>
+      await _methods.invokeListMethod<String>('pickFiles', {
+        'mimeType': mimeType,
+        'multiple': multiple,
+      }) ??
+      const [];
+
+  /// Pages, name and size of the PDF at [uri]; `pages` is null when it
+  /// needs a password ([password] is tried).
+  Future<({int? pages, String? name, int? size, bool protected})> pdfInfo(
+    String uri, {
+    String? password,
+  }) async {
+    final reply = jsonMap(
+      await _methods.invokeMethod<Object?>('pdfInfo', {
+        'uri': uri,
+        'password': password,
+      }),
+    );
+    return (
+      pages: reply['pages'] as int?,
+      name: reply['name'] as String?,
+      size: reply['size'] as int?,
+      protected: reply['protected'] as bool? ?? false,
+    );
+  }
+
+  /// Runs a PDF tool (`op` and its arguments, see CLAUDE.md) and saves what
+  /// it made in `targetDir`; the files' content URIs and sizes, in order.
+  Future<({List<String> uris, List<int> sizes})> editPdf(
+    Map<String, Object?> request,
+  ) async {
+    final reply = jsonMap(
+      await _methods.invokeMethod<Object?>('editPdf', request),
+    );
+    return (
+      uris: [for (final uri in reply['uris'] as List) uri as String],
+      sizes: [for (final size in reply['sizes'] as List) size as int],
+    );
+  }
+
+  /// Width and height in pixels of the image at [uri], as it is shown.
+  Future<({int width, int height})> probeImage(String uri) async {
+    final reply = jsonMap(
+      await _methods.invokeMethod<Object?>('probeImage', {'uri': uri}),
+    );
+    return (width: reply['width'] as int, height: reply['height'] as int);
+  }
+
+  /// Saves a copy of the image at [uri] as `<targetDir>/<name>.<format>`
+  /// (`jpg`, `png` or `webp`), [width] x [height] pixels at [quality]
+  /// (1-100). With [targetBytes], quality and then pixels are lowered until
+  /// it fits (`TOO_LARGE` if it can't). First the image is turned [rotate]
+  /// degrees clockwise (0, 90, 180, 270) and cut to [crop], a rectangle in
+  /// the turned image's pixels. The copy has no metadata.
+  Future<({String uri, int size})> editImage({
+    required String uri,
+    required String targetDir,
+    required String name,
+    required String format,
+    required int width,
+    required int height,
+    required int quality,
+    int? targetBytes,
+    int rotate = 0,
+    ({int left, int top, int width, int height})? crop,
+  }) async {
+    final reply = jsonMap(
+      await _methods.invokeMethod<Object?>('editImage', {
+        'rotate': rotate,
+        'crop': crop == null
+            ? null
+            : [crop.left, crop.top, crop.width, crop.height],
+        'uri': uri,
+        'targetDir': targetDir,
+        'name': name,
+        'format': format,
+        'width': width,
+        'height': height,
+        'quality': quality,
+        'targetBytes': targetBytes,
+      }),
+    );
+    return (uri: reply['uri'] as String, size: reply['size'] as int);
+  }
+
   /// Opens Android's folder picker at Download. The chosen folder's document
   /// id (`primary:Download/Videos`), or null if the user backed out.
   Future<String?> pickFolder() => _methods.invokeMethod<String>('pickFolder');

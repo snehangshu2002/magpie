@@ -8,7 +8,8 @@ import 'package:media_downloader/features/settings/presentation/settings_provide
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Bundled fonts (OFL) and the native downloader (GPL, PSF, Unlicense) ask
+  // Bundled fonts (OFL), the native downloader (GPL, PSF, Unlicense) and
+  // the PDF library (Apache, MIT) ask
   // for their licence text to ship with the app; Dart packages are listed
   // automatically.
   LicenseRegistry.addLicense(() async* {
@@ -20,6 +21,9 @@ Future<void> main() async {
       ('FFmpeg', 'licenses/GPL-3.0.txt'),
       ('yt-dlp', 'licenses/yt-dlp-Unlicense.txt'),
       ('Python', 'licenses/Python-PSF.txt'),
+      // PDF tools (storage/PdfEditor.kt) and the library it brings in.
+      ('PdfBox-Android', 'licenses/Apache-2.0.txt'),
+      ('Bouncy Castle', 'licenses/BouncyCastle-MIT.txt'),
     ]) {
       yield LicenseEntryWithLineBreaks([
         name,

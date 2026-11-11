@@ -16,6 +16,8 @@ abstract final class NativeErrorCode {
   static const tooLarge = 'TOO_LARGE';
   static const encode = 'ENCODE';
   static const nothingNew = 'NOTHING_NEW';
+  static const protectedPdf = 'PROTECTED';
+  static const unsupportedText = 'UNSUPPORTED_TEXT';
 }
 
 Failure failureFromPlatformException(PlatformException e) =>
@@ -34,6 +36,8 @@ Failure failureFromNativeCode(String? code, [String? detail]) => switch (code) {
   NativeErrorCode.tooLarge => Failure.tooLarge(detail: detail),
   NativeErrorCode.encode => Failure.encode(detail: detail),
   NativeErrorCode.nothingNew => const Failure.nothingNew(),
+  NativeErrorCode.protectedPdf => Failure.protectedPdf(detail: detail),
+  NativeErrorCode.unsupportedText => Failure.unsupportedText(detail: detail),
   _ => Failure.unknown(detail: '$code: $detail'),
 };
 

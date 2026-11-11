@@ -48,7 +48,7 @@ extension AppFontLabel on AppFont {
 
 extension ThemeColorLabel on ThemeColor {
   String label(AppLocalizations l10n) => switch (this) {
-    ThemeColor.sage => l10n.colorSage,
+    ThemeColor.indigo => l10n.colorIndigo,
     ThemeColor.sea => l10n.colorSea,
     ThemeColor.pine => l10n.colorPine,
     ThemeColor.lavender => l10n.colorLavender,

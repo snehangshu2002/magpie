@@ -142,6 +142,22 @@ class StorageBridge(
                 )
             }
 
+            "pickFiles" -> respond(result) {
+                pickFiles(call.requireString("mimeType"), call.argument<Boolean>("multiple") ?: false)
+            }
+
+            "pdfInfo" -> respond(result) {
+                withWorkDir { PdfEditor(context, it).info(Uri.parse(call.requireString("uri")), call.argument("password")) }
+            }
+
+            "editPdf" -> respond(result) { editPdf(call) }
+
+            "probeImage" -> respond(result) {
+                ImageEditor.probe(context, Uri.parse(call.requireString("uri")))
+            }
+
+            "editImage" -> respond(result) { editImage(call) }
+
             else -> result.notImplemented()
         }
     }
@@ -293,10 +309,52 @@ class StorageBridge(
      */
     /**
      * Saves [text] as `<targetDir>/<name>.txt` in shared storage, like a
-     * download; returns its content URI. Before Android 10 this needs write
+     * download; returns its content URI.
+     */
+    private suspend fun saveText(name: String, text: String, targetDir: String): String =
+        saveNew(name, "txt", targetDir) { it.writeText(text) }.toString()
+
+    /**
+     * Saves a copy of the image at [uri] as `<targetDir>/<name>.<format>`,
+     * `width`x`height` pixels at `quality`, under `targetBytes` when given
+     * (see [ImageEditor.edit]); returns `{uri, size}` of the copy.
+     */
+    private suspend fun editImage(call: MethodCall): Map<String, Any?> {
+        val format = call.requireString("format")
+        var size = 0L
+        val saved = saveNew(call.requireString("name"), format, call.requireString("targetDir")) { file ->
+            ImageEditor.edit(
+                context,
+                Uri.parse(call.requireString("uri")),
+                file,
+                format,
+                width = call.argument<Int>("width") ?: 0,
+                height = call.argument<Int>("height") ?: 0,
+                quality = call.argument<Int>("quality") ?: 85,
+                targetBytes = call.argument<Number>("targetBytes")?.toLong(),
+                rotate = call.argument<Int>("rotate") ?: 0,
+                crop = call.argument<List<Int>>("crop"),
+            )
+            size = file.length()
+        }
+        return mapOf("uri" to saved.toString(), "size" to size)
+    }
+
+    /**
+     * Saves what [write] puts in a file as `<targetDir>/<name>.<ext>` in
+     * shared storage, like a download. Before Android 10 this needs write
      * access, asked for here.
      */
-    private suspend fun saveText(name: String, text: String, targetDir: String): String {
+    private suspend fun saveNew(name: String, ext: String, targetDir: String, write: (File) -> Unit): Uri {
+        ensureWriteAccess()
+        return withWorkDir { dir ->
+            val file = File(dir, "${safeName(name)}.$ext").also(write)
+            MediaStoreSaver.save(context, file, targetDir)
+        }
+    }
+
+    /** Before Android 10, saving to shared storage needs write access, asked for here. */
+    private suspend fun ensureWriteAccess() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             host.requestPermissions(listOf(Manifest.permission.WRITE_EXTERNAL_STORAGE))
             if (context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
@@ -305,14 +363,69 @@ class StorageBridge(
                 throw StorageException("Storage permission denied")
             }
         }
-        val safeName = name.replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_").trim().take(120)
-            .ifBlank { "text" }
-        val workDir = File(context.cacheDir, "text/${System.nanoTime()}").apply { mkdirs() }
+    }
+
+    private fun safeName(name: String) =
+        name.replace(Regex("""[\\/:*?"<>|\p{Cntrl}]"""), "_").trim().take(120).ifBlank { "file" }
+
+    /** Android's file picker for [mimeType] files; the content URIs picked, none if the user backed out. */
+    private suspend fun pickFiles(mimeType: String, multiple: Boolean): List<String> {
+        val intent = Intent(Intent.ACTION_GET_CONTENT).setType(mimeType)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple)
+        val data = try {
+            host.pick(intent)
+        } catch (e: ActivityNotFoundException) {
+            throw NoAppException(e)
+        } ?: return emptyList()
+        val clip = data.clipData
+        return if (clip != null) {
+            List(clip.itemCount) { clip.getItemAt(it).uri.toString() }
+        } else {
+            listOfNotNull(data.data?.toString())
+        }
+    }
+
+    /**
+     * Runs a PDF tool (see [PdfJob]) and saves what it made in `targetDir`,
+     * like a download; returns `{uris, sizes}` in order. `compress` returns
+     * none when it couldn't make the PDF smaller.
+     */
+    private suspend fun editPdf(call: MethodCall): Map<String, Any?> {
+        ensureWriteAccess()
+        val job = PdfJob(
+            op = call.requireString("op"),
+            uris = call.requireUris(),
+            name = safeName(call.requireString("name")),
+            pages = call.argument<List<Int>>("pages"),
+            degrees = call.argument<Int>("degrees") ?: 90,
+            text = call.argument<String>("text").orEmpty(),
+            place = call.argument<String>("place") ?: "bottomCenter",
+            fontSize = call.argument<Number>("fontSize")?.toFloat() ?: 12f,
+            opacity = call.argument<Number>("opacity")?.toFloat() ?: 1f,
+            diagonal = call.argument<Boolean>("diagonal") ?: false,
+            password = call.argument<String>("password"),
+            quality = call.argument<Int>("quality") ?: 80,
+            maxSide = call.argument<Int>("maxSide") ?: 2000,
+            pageSize = call.argument<String>("pageSize") ?: "fit",
+        )
+        val targetDir = call.requireString("targetDir")
+        return withWorkDir { dir ->
+            val files = PdfEditor(context, dir).run(job)
+            mapOf(
+                "uris" to files.map { MediaStoreSaver.save(context, it, targetDir).toString() },
+                "sizes" to files.map { it.length() },
+            )
+        }
+    }
+
+    /** Runs [block] with a fresh folder in the cache, deleted afterwards. */
+    private suspend fun <T> withWorkDir(block: suspend (File) -> T): T {
+        val dir = File(context.cacheDir, "work/${System.nanoTime()}").apply { mkdirs() }
         try {
-            val file = File(workDir, "$safeName.txt").apply { writeText(text) }
-            return MediaStoreSaver.save(context, file, targetDir).toString()
+            return block(dir)
         } finally {
-            workDir.deleteRecursively()
+            dir.deleteRecursively()
         }
     }
 

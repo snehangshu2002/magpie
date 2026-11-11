@@ -3,7 +3,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'share_channel.g.dart';
 
-/// Text shared to the app from other apps' Share sheets (usually a link).
+/// Text shared to the app from other apps' Share sheets (usually a link),
+/// or an image, as its content URI.
 ///
 /// Native keeps a share that arrives before anyone listens (the one the app
 /// was launched with, or one sent while it was still starting) and sends it
@@ -24,6 +25,15 @@ class ShareChannel {
 @Riverpod(keepAlive: true)
 ShareChannel shareChannel(Ref ref) => ShareChannel();
 
+/// Whether a share is an image (its content URI) rather than text.
+bool _isImage(String shared) => shared.startsWith('content://');
+
 /// Every shared text, starting with the one the app was launched with.
 @Riverpod(keepAlive: true)
-Stream<String> sharedText(Ref ref) => ref.watch(shareChannelProvider).texts;
+Stream<String> sharedText(Ref ref) =>
+    ref.watch(shareChannelProvider).texts.where((s) => !_isImage(s));
+
+/// Content URI of every image shared to the app.
+@Riverpod(keepAlive: true)
+Stream<String> sharedImage(Ref ref) =>
+    ref.watch(shareChannelProvider).texts.where(_isImage);

@@ -26,6 +26,7 @@ extension OutputTypeLabel on OutputType {
     OutputType.video => l10n.outputVideo,
     OutputType.audio => l10n.outputAudio,
     OutputType.image => l10n.outputImage,
+    OutputType.document => l10n.outputDocument,
   };
 
   /// What the saved file contains.
@@ -33,12 +34,14 @@ extension OutputTypeLabel on OutputType {
     OutputType.video => l10n.outputVideoDetail,
     OutputType.audio => l10n.outputAudioDetail,
     OutputType.image => l10n.outputImageDetail,
+    OutputType.document => l10n.outputDocumentDetail,
   };
 
   IconData get icon => switch (this) {
     OutputType.video => Icons.movie_outlined,
     OutputType.audio => Icons.graphic_eq_rounded,
     OutputType.image => Icons.image_outlined,
+    OutputType.document => Icons.picture_as_pdf_outlined,
   };
 }
 
@@ -536,7 +539,7 @@ class _Dimmed extends StatelessWidget {
   );
 }
 
-/// A muted section title with an optional sage note at the end.
+/// A muted section title with an optional accent note at the end.
 class _SectionHeader extends StatelessWidget {
   const new({required this.title, this.trailing});
 

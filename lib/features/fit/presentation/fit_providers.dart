@@ -8,6 +8,8 @@ import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/fit/data/fit_repository_impl.dart';
 import 'package:media_downloader/features/fit/domain/fit_plan.dart';
+import 'package:media_downloader/features/fit/domain/fit_repository.dart';
+import 'package:media_downloader/features/fit/domain/video_tool.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -41,6 +43,46 @@ class FitJob extends _$FitJob {
     required int durationMs,
     required String name,
   }) async {
+    await _run(
+      item,
+      (repository, id, targetDir) => repository.start(
+        id: id,
+        item: item,
+        size: size,
+        plan: plan,
+        durationMs: durationMs,
+        targetDir: targetDir,
+        name: name,
+      ),
+    );
+  }
+
+  /// Makes [job]'s file from [item] (audio, a part, a GIF…), saved as
+  /// [name] in the same folder.
+  Future<void> startTool({
+    required LibraryItem item,
+    required VideoJob job,
+    required String name,
+  }) => _run(
+    item,
+    (repository, id, targetDir) => repository.startTool(
+      id: id,
+      item: item,
+      job: job,
+      targetDir: targetDir,
+      name: name,
+    ),
+  );
+
+  Future<void> _run(
+    LibraryItem item,
+    Future<Result<String>> Function(
+      FitRepository repository,
+      String id,
+      String targetDir,
+    )
+    start,
+  ) async {
     if (_busy) return;
     _stopFollowing();
     state = const AsyncLoading();
@@ -48,17 +90,13 @@ class FitJob extends _$FitJob {
     final id = _newId();
     // Listen first, so events sent while the call returns are not missed.
     _progress = repository.progressOf(id).listen(_onProgress);
-    final result = await repository.start(
-      id: id,
-      item: item,
-      size: size,
-      plan: plan,
-      durationMs: durationMs,
-      targetDir: saveDirFor(
+    final result = await start(
+      repository,
+      id,
+      saveDirFor(
         (await ref.read(settingsProvider.future)).saveFolder,
         item.platform,
       ),
-      name: name,
     );
     if (!ref.mounted) return;
     switch (result) {

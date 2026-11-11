@@ -7,7 +7,8 @@ Guidance for Claude (and humans) working in this repository.
 An open-source Android app that downloads videos, audio and images from
 YouTube, Instagram, X/Twitter, Reddit and other sites supported by yt-dlp,
 and saves them straight to the device's shared storage (visible in the file
-manager and gallery).
+manager and gallery). It also edits photos, videos and PDFs on the phone
+(Tools tab): "Save, edit and convert".
 
 - **Platform:** Android only (no iOS, no Play Store)
 - **Distribution:** GitHub Releases (signed APKs) and F-Droid (built and
@@ -34,6 +35,7 @@ manager and gallery).
 | Wallpaper colours | `dynamic_color` 1.9 (BSD) | Settings → Wallpaper colours; 2.x needs `material_ui`, which Flutter's `ColorScheme` isn't yet |
 | Download engine | **yt-dlp via `youtubedl-android`** (Kotlin) | Called through a platform channel |
 | Media processing | FFmpeg bundled with `youtubedl-android` | Do NOT add `ffmpeg_kit_flutter` (original project retired) |
+| PDF | `pdfbox-android` 2.0.27.0 (Apache-2.0) + Android `PdfRenderer` | `storage/PdfEditor.kt`; adds ~2 MB to the release APK |
 | Models / codegen | `freezed` + `json_serializable` + `riverpod_generator` + `drift_dev` via `build_runner` | Generated files are git-ignored |
 | Lints | `very_good_analysis` | `public_member_api_docs` off |
 | Background work | Kotlin foreground service (`dataSync` type) | Downloads must survive app backgrounding |
@@ -91,20 +93,23 @@ lib/
     media/source_platform.dart # SourcePlatform: host/extractor -> site, folder name
     db/app_database.dart       # drift database: download_records (schema v3: + video_key)
     router/                    # go_router config + bottom-nav AppShell; BranchPager swipes between sections
-    theme/                     # AppTheme (sage palette, superellipse shapes, tracking), motion.dart (SpringCurve)
-    widgets/                   # shared widgets: PlatformBadge, PressableScale, SectionLabel
+    theme/                     # AppTheme (indigo palette, superellipse shapes, tracking), motion.dart (SpringCurve)
+    widgets/                   # shared widgets: PlatformBadge, PressableScale, SectionLabel, sheet_buttons (primarySheetButton/secondarySheetButton)
     errors/                    # Failure union, native error mapping, l10n messages
     utils/                     # result.dart (Result<T> = Ok | Err), formatters.dart, network_options.dart (applyNetworkOptions: Settings' proxy/IPv4/user agent on an HttpClient)
   features/
     intake/                    # link box, platform detection (detectLink), share/paste intake
     download/                  # fetchInfo preview, full-size photos yt-dlp misses (X, image links), suggested options, format picker, playlists (playlist_options), trim (ClipSelection), Settings -> yt-dlp args (download_args), download progress
-    library/                   # in-progress + saved files (drift + app/storage), filters/search, open/share/fit for sharing/copy link/delete, long-press multi-select (share/delete), sync
-    fit/                       # "Fit for sharing": smaller copies of saved videos under a size (planFit), sheet from the Library's file menu
+    library/                   # in-progress + saved files (drift + app/storage), filters/search, sort (`LibrarySort`), rows or a grid of previews (`libraryViewProvider`), storage per site (`storageBySite`), open/share/fit for sharing/copy link/delete, long-press multi-select (share/delete), sync
+    image_edit/                # "Resize or convert": rotated, cropped, resized, recompressed or converted copies of one or several images (scaledSize, centeredCrop, ImageFormat), sheet from the Library's file menu, the Tools tab or an image shared to the app
+    pdf/                       # PDF tools (PdfTool, parsePageRange, pagesFor): photos to PDF, merge, compress, split/delete/rotate pages, add text/page numbers/watermark, lock/unlock, pages to photos; one sheet (PdfToolSheet)
+    tools/                     # Tools tab (ToolsScreen) and ToolEntry/ToolCard/ToolGrid/launchTool (pick files, open the tool), also used on Home and in a PDF's Library menu
+    fit/                       # "Fit for sharing": smaller copies of saved videos under a size (planFit), and "Video tools" (planVideoJob: sound only, cut a part, no sound, MP4, GIF); sheets from the Library's file menu
     settings/                  # appearance (theme, font, colour (`ThemeColor` swatches), wallpaper colours, pure black), downloads, saved files (audio format, cover art, subtitles, SponsorBlock, MKV), accounts (sign-ins), advanced (speed limit, proxy, file names, extra options), updates, about
     updater/                   # GitHub releases/latest check at launch, update bottom sheet (AppShell): size, what's new, Update/Later
   l10n/                        # app_en.arb + l10n.dart (context.l10n)
 assets/images/logo.png         # app mark (256px) shown in the Download header and licenses page
-assets/licenses/               # GPL-3.0 (youtubedl-android, FFmpeg), yt-dlp Unlicense, Python PSF; shown on the licenses page via main.dart
+assets/licenses/               # GPL-3.0 (youtubedl-android, FFmpeg), yt-dlp Unlicense, Python PSF, Apache-2.0 (pdfbox-android), Bouncy Castle (MIT); shown on the licenses page via main.dart
 assets/fonts/                  # Inter + Source Serif 4 (OFL): static 400/500/600/700, subset to Latin/Greek/Cyrillic; licenses registered in main.dart
 android/app/src/main/kotlin/com/snehangshu/magpie/
   MainActivity.kt              # wires the bridges; implements ActivityHost
@@ -113,7 +118,7 @@ android/app/src/main/kotlin/com/snehangshu/magpie/
   engine/Engine.kt             # shared lazy yt-dlp/FFmpeg init
   engine/EngineErrors.kt       # native error codes
   engine/DownloadService.kt    # dataSync foreground service: runs yt-dlp (and fitVideo jobs), max 2 at once
-  engine/VideoFitter.kt        # runs the bundled FFmpeg (libffmpeg.so) to re-encode a video under a byte target
+  engine/VideoFitter.kt        # runs the bundled FFmpeg (libffmpeg.so): re-encodes a video under a byte target, or runs a `convertVideo` job's arguments
   engine/ImageFetcher.kt       # plain HTTP download of the photos of an `images` job
   engine/SavedFiles.kt         # picks, orders and names the files of a post or playlist run (JVM-tested)
   engine/Cookies.kt            # sign-ins as a Netscape cookie file (noBackupFilesDir/cookies.txt), passed as --cookies
@@ -123,7 +128,9 @@ android/app/src/main/kotlin/com/snehangshu/magpie/
   engine/DownloadResults.kt    # final events kept in SharedPreferences until Dart takes them
   storage/MediaStoreSaver.kt   # copies the finished file into Download/ (MediaStore, legacy dir < API 29)
   storage/StorageBridge.kt     # app/storage handlers
-  share/ShareBridge.kt         # app/share: SEND text, kept until Dart listens
+  storage/ImageEditor.kt       # decodes, rotates, scales and re-encodes an image (Bitmap; JVM-tested quality search)
+  storage/PdfEditor.kt         # editPdf/pdfInfo: pdfbox-android (merge, pages, text, passwords, smaller pictures) + PdfRenderer (pages as JPGs)
+  share/ShareBridge.kt         # app/share: SEND text or one image (its URI), kept until Dart listens
   AppearanceBridge.kt          # app/appearance: UiModeManager.setApplicationNightMode (API 31+)
   updater/UpdaterBridge.kt     # app/updater handlers
 test/                          # mirrors lib/
@@ -142,6 +149,7 @@ Channel names: `app/engine` (methods) and `app/engine/progress` (events).
 | `fetchTranscript` | `{url, lang, auto, options}` | `{text, ext}`: the caption track as WebVTT (`--skip-download`; `NOT_FOUND` if no file) |
 | `startDownload` | `{id, url, formatId, targetDir, title?, items?, imageUrls?, options, playlist, archive, fileName?}` | `{id}` |
 | `fitVideo` | `{id, uri, targetDir, name, targetBytes, durationMs, videoKbps, audioKbps, maxShortSide, title?}` | `{id}` |
+| `convertVideo` | `{id, uri, targetDir, name, ext, inputArgs, outputArgs, durationMs, title?}` | `{id}` |
 | `cancelDownload` | `{id}` | `bool` (false if not queued/running) |
 | `updateEngine` | `{channel: "stable"\|"nightly"}` | `{status, version}` |
 | `takeFinishedDownloads` | – | `[progress event]` (final events since last call, each returned once) |
@@ -257,6 +265,22 @@ encode can overshoot, so a result over `targetBytes` is encoded again at a
 proportionally lower video bitrate (3 tries in all, never below 80 kbps);
 still too big → `TOO_LARGE`.
 
+`convertVideo` runs FFmpeg over the saved video at `uri` as
+`ffmpeg <inputArgs> -i <copy of the file> <outputArgs> <name>.<ext>` and
+saves the result like a download. It is a `DownloadService` job like
+`fitVideo` (`formatId` `convert`, `ConvertSpec`; same events, cancel and
+Library row), with `percent` measured against `durationMs`, the length of
+the result. Dart writes the arguments (`planVideoJob` in
+`features/fit/domain/video_tool.dart`) for the "Video tools" sheet
+(`video_tools_sheet.dart`, Library file menu of a video): sound only
+(`-vn`, AAC in `.m4a`), cut a part (`-ss`/`-to` before the input with
+`-c copy`, so the start lands on a key frame), no sound (`-an`, video
+copied), MP4 (libx264 + AAC, hidden for an `.mp4`) and GIF (12 fps, at
+most 480 px wide, at most 30 s: `maxGifMs`). Copied streams keep the
+source's container when it is `mp4`/`mkv`/`webm`/`mov`, else `mkv`. The
+bundled FFmpeg has all of these encoders (checked on a device: `aac`,
+`libx264`, `gif`).
+
 FFmpeg is youtubedl-android's: `<nativeLibraryDir>/libffmpeg.so`, run with
 `LD_LIBRARY_PATH` = `noBackupFilesDir/youtubedl-android/packages/{python,ffmpeg}/usr/lib`
 (what youtubedl-android sets for yt-dlp). `Engine.ensureInitialized` must run
@@ -289,7 +313,47 @@ Second channel, `app/storage` (saved files, by content URI):
 | `deleteFiles` | `{uris: [..]}` | `[uri]` now gone. Files the app no longer owns need consent: one system prompt for all on API 30+, one each on API 29; declined ones are left out |
 | `probeVideo` | `{uri}` | `{durationMs?, width?, height?, hasAudio}` via `MediaMetadataRetriever`; width/height before rotation. `NOT_FOUND` if gone, `STORAGE` if unreadable |
 | `saveText` | `{name, text, targetDir}` | content URI of `<targetDir>/<name>.txt` (saved like a download; asks for `WRITE_EXTERNAL_STORAGE` below API 29, `STORAGE` if denied) |
+| `pickFiles` | `{mimeType, multiple}` | `[uri]` of the files picked in Android's picker (`ACTION_GET_CONTENT`, e.g. `image/*`, `application/pdf`; `EXTRA_ALLOW_MULTIPLE`); empty if backed out (`NO_APP`) |
+| `pdfInfo` | `{uri, password?}` | `{pages?, name?, size?, protected}`; `pages` null (and `protected` true) when it needs a password and `password` doesn't open it |
+| `editPdf` | `{op, uris, targetDir, name, pages?, degrees, text, place, fontSize, opacity, diagonal, password?, quality, maxSide, pageSize}` | `{uris, sizes}` of what it saved, in order (see below) |
+| `probeImage` | `{uri}` | `{width, height}` as shown (after EXIF rotation). `NOT_FOUND` if gone, `STORAGE` if unreadable |
+| `editImage` | `{uri, targetDir, name, format, width, height, quality, targetBytes?, rotate?, crop?}` | `{uri, size}` of the copy `<targetDir>/<name>.<format>` (`jpg`\|`png`\|`webp`), scaled to `width`x`height` at `quality` (1–100). With `targetBytes`, native lowers quality (`ImageEditor.bestQuality`, never below 10; PNG has none) and then the pixels (×¾ a round) until it fits, else `TOO_LARGE`. First the image is turned `rotate` degrees clockwise (0/90/180/270, on top of its EXIF rotation) and cut to `crop` (`[left, top, width, height]` in the turned image's pixels). The copy is redrawn from the pixels, so it has no EXIF (location, camera) |
 | `pickFolder` | – | tree document id (`primary:Download/Clips`) or null if backed out (`NO_APP`). Opens `ACTION_OPEN_DOCUMENT_TREE` at Download; Dart accepts only folders in `Download/` on `primary` (`saveFolderFromTreeId`), since files are saved through the Downloads collection |
+
+"Resize or convert" (`features/image_edit`; sheet from the Library's file
+menu for images, from
+the Tools tab (`ToolEntry.editPhotos`), whose card calls `pickFiles`, and from the
+Library's selection bar when only images are picked) calls these directly,
+with no service job: Dart decides the rotation, the crop (`centeredCrop`
+of a `CropShape`: full, 1:1, 4:5, 16:9, 9:16, always from the middle; the
+sheet previews it on the file's thumbnail), the size (`scaledSize`: typing
+one side sets the other; never upscaled), format (`ImageFormat`) and
+quality. Several images at once get the same shape, a percentage of their
+own size and the same format, one `editImage` call each. It saves next to the original
+(`saveDirFor`) and adds a saved row itself (`formatId` `edit`).
+
+`editPdf` `op` (Dart's `PdfTool.op`; Dart decides every value):
+`fromImages` (`uris` are photos, each upright on a page the photo's size at
+150 dpi or centred on A4 (`pageSize`), JPEG at `quality`, at most `maxSide`
+px), `merge` (in `uris` order), `compress` (each picture re-encoded as JPEG
+at `quality` and at most `maxSide` px, kept only when smaller; stencils and
+colour-key masks are left; returns no file when the whole PDF isn't
+smaller), `extract` (keeps `pages`; "Delete pages" sends the others),
+`rotate` (`pages` or all by `degrees`), `addText` (`text` with `{n}` and
+`{total}` replaced, upright as the page is shown, at `place`
+(`topLeft`…`bottomRight`, `center`) or large and diagonal at `opacity` for a
+watermark, in the app's Inter font from `flutter_assets`: Latin, Greek and
+Cyrillic only, else `UNSUPPORTED_TEXT`), `protect` (AES-256, `password`
+for opening and owner), `unlock` (opens with `password`, saves without
+security) and `toImages` (each page via `PdfRenderer` at 150 dpi, at most
+2500 px, `<name> <n>.jpg`). A PDF that needs a password, or a wrong one, is
+`PROTECTED`. Inputs are copied into a work dir; pdfbox uses temp-file
+memory. Results are saved like `saveText` and recorded by Dart as saved rows
+(`formatId` `pdf`, `outputType` `document` (a PDF) or `image`).
+PDFs can't be shared into the app yet (only text and one image). A PDF opened
+with its password (or one that only restricts printing or copying) is saved
+protected again with that password and its restrictions (`keepSecurity`; the
+original owner password is lost); `merge` refuses protected PDFs (`PROTECTED`).
 
 Events on `app/storage/changes`: `null` whenever MediaStore changes (a
 `ContentObserver` on `MediaStore.Files` external, registered while Dart
@@ -299,7 +363,9 @@ manager drop out of the Library.
 
 Errors are sent as `PlatformException` with `code` ∈ `UNSUPPORTED_URL |
 NETWORK | ENGINE | STORAGE | CANCELLED | NOT_FOUND | NO_APP | TOO_LARGE |
-ENCODE | NOTHING_NEW | UNKNOWN` (`TOO_LARGE`: `fitVideo` couldn't get under the target;
+ENCODE | NOTHING_NEW | PROTECTED | UNSUPPORTED_TEXT | UNKNOWN` (`TOO_LARGE`: `fitVideo` couldn't get under the target;
+`PROTECTED`: a PDF needs a password or it's wrong; `UNSUPPORTED_TEXT`: the
+PDF font has no letters for the text;
 `ENCODE`: FFmpeg failed; an `images` job's HTTP errors are `NETWORK`,
 404/410 `NOT_FOUND`, a reply that isn't an image `UNSUPPORTED_URL`) (`EngineErrors.kt` ↔
 `NativeErrorCode` in `lib/core/errors/platform_failure.dart`). Any other code
@@ -307,7 +373,11 @@ becomes `Failure.unknown`. A method with no native handler
 (`MissingPluginException`) becomes `Failure.unavailable`.
 
 Third channel, `app/share` (events only): the `EXTRA_TEXT` of each
-`ACTION_SEND` intent (launch or `onNewIntent`). A share that arrives before
+`ACTION_SEND` intent (launch or `onNewIntent`), or for an `image/*` share
+the `EXTRA_STREAM` content URI as a string (`sharedImageProvider` takes
+the `content://` ones, `sharedTextProvider` the rest; AppShell opens the
+image sheet on it, and its copy has an empty `url`, so the Library hides
+"Copy link"). One image only, no `SEND_MULTIPLE`. A share that arrives before
 Dart listens is kept (latest only) and sent on listen, so shares made while
 the app is still starting are not lost. Intents replayed from Recents
 (`FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`) or a recreated activity are ignored.
@@ -377,7 +447,9 @@ in the same commit, and documented here.
 
 **Later (not v1):** clipboard watcher, multiple languages, SD card saving,
 several audio tracks in one video.
-(Shipped since: Fit for sharing (`features/fit`); playlists, trim, audio
+(Shipped since: PDF tools (`features/pdf`, Tools tab); Fit for sharing and video tools (`features/fit`); resize,
+crop, rotate or convert images (`features/image_edit`); Library sorting,
+grid and storage summary; playlists, trim, audio
 conversion, cover art/metadata/subtitle embedding, SponsorBlock, sign-ins
 (cookies), wallpaper colours and the advanced download settings, after
 Seal.)
@@ -401,23 +473,32 @@ Do not build later items unless asked.
   animations; use `AppTheme.shape(r)` (superellipse) for rounded surfaces;
   haptics only on meaningful moments (link recognized, selection, commit);
   validate input inline as the user types
-- Visual design follows the Stitch project "Magpie Media Downloader App"
-  (calm sage, Material 3). Sage is the default `ThemeColor`; the other
-  colours grow a scheme from their seed (`AppTheme.scheme`). Read colours from `Theme.of(context).colorScheme`,
-  never hard-code them; `AppTheme` holds the palette (light: Stitch's exact
-  colours; dark: its "deep peat" notes). Patterns in use:
+- Visual design: Material 3, indigo on near-neutral surfaces (the app was
+  rebranded from sage, which came from the Stitch project "Magpie Media
+  Downloader App"). Indigo is the default `ThemeColor` (`AppTheme._seed`
+  `#4F5BD5`, `DynamicSchemeVariant.content`: the seed is `primaryContainer`,
+  `tertiary` is violet, used for PDF tool badges; a stored `sage` from
+  before reads as indigo); the other colours grow a scheme from their seed
+  (`AppTheme.scheme`). The logo and launcher icon are the cream bird on
+  indigo. Read colours from `Theme.of(context).colorScheme`, never hard-code
+  them. Patterns in use:
   - depth from tone, not shadow: page `surface`, cards `surfaceContainer`,
     sheets `surfaceContainerHigh`, hairlines `outlineVariant` at ~30–60%
   - cards 24 radius, link box 20, nested thumbnails 12–16; buttons, chips,
     segmented controls and progress bars are full pills (`StadiumBorder`)
   - primary filled actions use `primary` (Download, selected segment); the
-    softer sage actions (Paste, Update, selected chip) use `primaryContainer`
-  - section headings are `SectionLabel` (uppercase, sage); grouped rows sit
+    softer actions (Paste, Update, selected chip) use `primaryContainer`
+  - tool sheets open with `useRootNavigator: true`, over the navigation bar
+  - tabs: Home (link box, then photo/PDF tool cards that step aside once a
+    link is submitted), Tools, Library, Settings
+  - section headings are `SectionLabel` (uppercase, accent colour); grouped rows sit
     in one card with inset dividers (Settings, option lists)
   - numbers that change or line up (sizes, %, speed, fps) use
     `FontFeature.tabularFigures()`
   - platform logos come from `simple_icons` via `PlatformBadge`; never the
     Stitch placeholder glyphs
+  - the bottom navigation is a floating pill (`AppShell`): `surfaceContainerHigh`,
+    inset by the page gutter, 12 above the system bar
   - no non-functional controls: leave out a design's button until the
     feature behind it exists (e.g. pause)
 - Kotlin: coroutines for background work; never block the main thread
@@ -465,6 +546,13 @@ are not committed; run the first two commands after cloning or pulling.
 - Also declared: `ACCESS_NETWORK_STATE` (`networkStatus`, "Ask before using
   mobile data") and `SignInActivity` (not exported).
 - `androidx.core` is declared explicitly for NotificationCompat/ServiceCompat.
+- pdfbox-android: `PDFBoxResourceLoader.init` runs in `PdfEditor`;
+  `proguard-rules.pro` has `-dontwarn com.gemalto.jp2.**` (its optional JPEG
+  2000 decoder isn't included, so JPX pictures are skipped), and
+  `packaging.resources.excludes` drops `org/bouncycastle/**` data files
+  (~4 MB; BouncyCastle is only for signatures). Release builds were checked
+  on a device (merge, add text, watermark, lock/unlock, compress, pages to
+  photos); a debug build alone doesn't show R8 problems.
 
 
 ## Releases

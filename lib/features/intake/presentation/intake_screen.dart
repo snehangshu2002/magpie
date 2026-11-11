@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:media_downloader/core/router/app_router.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/widgets/page_header.dart';
+import 'package:media_downloader/core/widgets/section_label.dart';
 import 'package:media_downloader/features/download/domain/download_option.dart';
 import 'package:media_downloader/features/download/presentation/media_providers.dart';
 import 'package:media_downloader/features/download/presentation/start_download.dart';
@@ -17,6 +20,7 @@ import 'package:media_downloader/features/intake/presentation/widgets/link_field
 import 'package:media_downloader/features/intake/presentation/widgets/link_status.dart';
 import 'package:media_downloader/features/intake/presentation/widgets/supported_platforms.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
+import 'package:media_downloader/features/tools/presentation/tool_entry.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 /// Paste or share a link, see what it is, and pick what to save.
@@ -241,9 +245,15 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                       alignment: Alignment.topCenter,
                       child: submitted != null
                           ? const SizedBox(width: double.infinity)
-                          : PageHeader(
-                              title: l10n.intakeTitle,
-                              subtitle: l10n.intakeHint,
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                PageHeader(
+                                  title: l10n.intakeTitle,
+                                  subtitle: l10n.intakeHint,
+                                ),
+                                SectionLabel(l10n.homeDownloadLabel),
+                              ],
                             ),
                     ),
                     LinkField(
@@ -290,6 +300,15 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
                         child: results,
                       ),
                     ),
+                    // Photo and PDF tools, until there's a link to work on.
+                    AnimatedSize(
+                      duration: duration,
+                      curve: AppMotion.standard,
+                      alignment: Alignment.topCenter,
+                      child: submitted != null
+                          ? const SizedBox(width: double.infinity)
+                          : const _HomeTools(),
+                    ),
                   ],
                 ),
               ),
@@ -319,6 +338,43 @@ class _IntakeScreenState extends ConsumerState<IntakeScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// The most used photo and PDF tools, and a way to all of them.
+class _HomeTools extends StatelessWidget {
+  const new();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionLabel(l10n.homeToolsLabel),
+          const ToolGrid(
+            entries: [
+              ToolEntry.editPhotos,
+              ToolEntry.imagesToPdf,
+              ToolEntry.compress,
+              ToolEntry.merge,
+              ToolEntry.addText,
+              ToolEntry.protect,
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => context.go(AppRoutes.tools),
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: Text(l10n.homeAllTools),
+            ),
+          ),
+        ],
       ),
     );
   }

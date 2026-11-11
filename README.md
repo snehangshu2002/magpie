@@ -20,11 +20,13 @@
 
 ---
 
-Magpie is a free and open-source downloader for Android. Share a link from
-YouTube, Instagram, X (Twitter), Facebook or
+Magpie is a free and open-source Android app to save media and edit photos
+and PDFs. Share a link from YouTube, Instagram, X (Twitter), Facebook or
 [hundreds of other sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md),
 choose what you want, and Magpie saves it to your phone's `Download` folder,
-where your gallery and file manager can see it.
+where your gallery and file manager can see it. Its Tools tab resizes,
+crops and converts photos, and merges, compresses, splits, annotates and
+password-protects PDFs, all on the phone.
 
 No account. No ads. No tracking.
 

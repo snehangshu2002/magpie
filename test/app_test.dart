@@ -218,15 +218,37 @@ void main() {
     await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
     await tester.pumpAndSettle();
     expect(nav().selectedIndex, 1);
+    expect(find.text('Photo and PDF tools'), findsOneWidget);
 
     await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
     await tester.pumpAndSettle();
     expect(nav().selectedIndex, 2);
+
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(nav().selectedIndex, 3);
     expect(find.byTooltip('Source code on GitHub'), findsOneWidget);
 
     await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
     await tester.pumpAndSettle();
-    expect(nav().selectedIndex, 1);
+    expect(nav().selectedIndex, 2);
+  });
+
+  testWidgets('home and tools fit a 360-wide phone', (tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpApp(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('Compress PDF'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.handyman_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Photo and PDF tools'), findsOneWidget);
+    // Overflowing text or cards would have thrown while laying out.
+    await tester.drag(find.text('Photo and PDF tools'), const Offset(0, -1500));
+    await tester.pumpAndSettle();
+    expect(find.text('PDF to photos'), findsOneWidget);
   });
 
   testWidgets('settings has a GitHub button at the top', (tester) async {
@@ -455,7 +477,7 @@ void main() {
     await tester.tap(sea, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    expect(settings.settings.themeColor, ThemeColor.sage);
+    expect(settings.settings.themeColor, ThemeColor.indigo);
   });
 
   testWidgets('a folder inside Download becomes the save location', (

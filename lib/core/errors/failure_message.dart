@@ -13,6 +13,8 @@ extension FailureMessage on Failure {
     TooLargeFailure() => l10n.failureTooLarge,
     EncodeFailure() => l10n.failureEncode,
     NothingNewFailure() => l10n.failureNothingNew,
+    ProtectedPdfFailure() => l10n.failureProtectedPdf,
+    UnsupportedTextFailure() => l10n.failureUnsupportedText,
     UnavailableFailure() => l10n.failureUnavailable,
     UnknownFailure() => l10n.failureUnknown,
   };

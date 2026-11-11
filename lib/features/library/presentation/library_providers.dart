@@ -9,6 +9,7 @@ import 'package:media_downloader/features/library/data/library_repository_impl.d
 import 'package:media_downloader/features/library/domain/active_download.dart';
 import 'package:media_downloader/features/library/domain/library_filter.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
+import 'package:media_downloader/features/library/domain/library_view.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'library_providers.g.dart';
@@ -113,4 +114,18 @@ class ActiveCancelling extends _$ActiveCancelling {
   // Named argument, so a call site reads as what it does.
   // ignore: use_setters_to_change_properties
   void set({required bool value}) => state = value;
+}
+
+/// How the Library lists its files: their order, and rows or a grid of
+/// previews.
+// shortcut: kept only while the app runs, move to settings if users ask.
+@Riverpod(keepAlive: true)
+class LibraryView extends _$LibraryView {
+  @override
+  ({LibrarySort sort, bool grid}) build() =>
+      (sort: LibrarySort.newest, grid: false);
+
+  void sortBy(LibrarySort sort) => state = (sort: sort, grid: state.grid);
+
+  void toggleGrid() => state = (sort: state.sort, grid: !state.grid);
 }

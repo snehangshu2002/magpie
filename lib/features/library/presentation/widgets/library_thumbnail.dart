@@ -40,6 +40,7 @@ class LibraryThumbnail extends ConsumerWidget {
         OutputType.video => Icons.movie_outlined,
         OutputType.audio => Icons.music_note_rounded,
         OutputType.image => Icons.image_outlined,
+        OutputType.document => Icons.picture_as_pdf_outlined,
       }, color: scheme.onSurfaceVariant),
     );
     final remote = thumbnailUrl;

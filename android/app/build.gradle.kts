@@ -64,6 +64,9 @@ android {
             // Zip archives named *.so; they are not ELF files and cannot be stripped.
             keepDebugSymbols += "**/*.zip.so"
         }
+        // BouncyCastle's data files (post-quantum tables and the like), pulled
+        // in by pdfbox-android for signatures; the PDF tools don't use them.
+        resources.excludes += "org/bouncycastle/**"
     }
 }
 
@@ -83,6 +86,8 @@ dependencies {
     // NotificationCompat/ServiceCompat for DownloadService; already pulled in by Flutter plugins.
     implementation("androidx.core:core:1.17.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    // PDF tools (storage/PdfEditor.kt): merge, pages, text, passwords. Apache-2.0.
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     // JVM tests of the file handling in SavedFiles.kt.
     testImplementation("junit:junit:4.13.2")
 }

@@ -17,6 +17,19 @@ data class FitSpec(
     val name: String,
 )
 
+/** An FFmpeg run over a saved video, with the arguments Dart chose (`convertVideo`). */
+data class ConvertSpec(
+    /** File name without extension. */
+    val name: String,
+    val ext: String,
+    /** Placed before `-i` (e.g. `-ss`, `-to`). */
+    val inputArgs: List<String>,
+    /** Placed between the input and the output file. */
+    val outputArgs: List<String>,
+    /** Length of the result, for progress; 0 when unknown. */
+    val durationMs: Long,
+)
+
 /** The encode came out bigger than the target even at the lowest bitrate tried. */
 class FitTooLargeException(message: String) : IOException(message)
 
@@ -61,6 +74,20 @@ internal class VideoFitter(private val context: Context) {
         }
     }
 
+    /** Runs FFmpeg over [input] with [spec]'s arguments, writing [output]. */
+    fun convert(
+        input: File,
+        output: File,
+        spec: ConvertSpec,
+        onStart: (Process) -> Unit,
+        onProgress: (percent: Float) -> Unit,
+    ) = run(
+        spec.inputArgs + listOf("-i", input.absolutePath) + spec.outputArgs + output.absolutePath,
+        spec.durationMs,
+        onStart,
+        onProgress,
+    )
+
     private fun encode(
         input: File,
         output: File,
@@ -71,9 +98,6 @@ internal class VideoFitter(private val context: Context) {
     ) {
         val side = spec.maxShortSide
         val args = buildList {
-            add(ffmpegBinary().absolutePath)
-            addAll(listOf("-hide_banner", "-nostdin", "-y", "-loglevel", "error"))
-            addAll(listOf("-progress", "pipe:1", "-nostats"))
             addAll(listOf("-i", input.absolutePath))
             addAll(listOf("-map", "0:v:0"))
             // Scales the shorter side down to `side`, keeping the aspect ratio
@@ -96,7 +120,22 @@ internal class VideoFitter(private val context: Context) {
             addAll(listOf("-movflags", "+faststart"))
             add(output.absolutePath)
         }
-        val process = ProcessBuilder(args)
+        run(args, spec.durationMs, onStart, onProgress)
+    }
+
+    /** Runs FFmpeg with [args], reporting how far along [durationMs] it is. */
+    private fun run(
+        args: List<String>,
+        durationMs: Long,
+        onStart: (Process) -> Unit,
+        onProgress: (Float) -> Unit,
+    ) {
+        val command = listOf(
+            ffmpegBinary().absolutePath,
+            "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
+            "-progress", "pipe:1", "-nostats",
+        ) + args
+        val process = ProcessBuilder(command)
             .redirectErrorStream(true)
             .apply { environment()["LD_LIBRARY_PATH"] = libraryPath() }
             .start()
@@ -104,7 +143,7 @@ internal class VideoFitter(private val context: Context) {
 
         // With -loglevel error, anything that isn't a progress key is an error line.
         val errors = ArrayDeque<String>()
-        val totalUs = spec.durationMs * 1000
+        val totalUs = durationMs * 1000
         process.inputStream.bufferedReader().useLines { lines ->
             lines.forEach { line ->
                 when {

@@ -1,6 +1,8 @@
 package com.snehangshu.magpie.engine
 
 import com.snehangshu.magpie.storage.NoAppException
+import com.snehangshu.magpie.storage.PdfProtectedException
+import com.snehangshu.magpie.storage.UnsupportedTextException
 import com.snehangshu.magpie.storage.StorageException
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
@@ -24,6 +26,8 @@ internal object EngineErrors {
     const val TOO_LARGE = "TOO_LARGE"
     const val ENCODE = "ENCODE"
     const val NOTHING_NEW = "NOTHING_NEW"
+    const val PROTECTED = "PROTECTED"
+    const val UNSUPPORTED_TEXT = "UNSUPPORTED_TEXT"
     const val UNKNOWN = "UNKNOWN"
 
     data class Error(val code: String, val message: String?)
@@ -48,6 +52,8 @@ internal object EngineErrors {
             e.message,
         )
         is StorageException -> Error(STORAGE, e.message)
+        is PdfProtectedException -> Error(PROTECTED, e.message)
+        is UnsupportedTextException -> Error(UNSUPPORTED_TEXT, e.message)
         is FitTooLargeException -> Error(TOO_LARGE, e.message)
         is EncodeException -> Error(ENCODE, e.message)
         is NothingNewException -> Error(NOTHING_NEW, e.message)

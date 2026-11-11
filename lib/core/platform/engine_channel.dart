@@ -77,6 +77,15 @@ class EngineChannel {
     return reply['id'] as String;
   }
 
+  /// Runs FFmpeg over the saved video at `uri` with `inputArgs` (before
+  /// the input) and `outputArgs`, saved as `<targetDir>/<name>.<ext>`.
+  /// Arguments: `{id, uri, targetDir, name, ext, inputArgs, outputArgs,
+  /// durationMs, title?}`. Reports progress and finishes like a download.
+  Future<String> convertVideo(Map<String, Object?> request) async {
+    final reply = await _invokeMap('convertVideo', request);
+    return reply['id'] as String;
+  }
+
   Future<bool> cancelDownload(String id) async =>
       await _methods.invokeMethod<bool>('cancelDownload', {'id': id}) ?? false;
 

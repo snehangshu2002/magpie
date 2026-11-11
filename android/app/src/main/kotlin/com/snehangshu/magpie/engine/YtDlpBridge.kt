@@ -134,6 +134,27 @@ class YtDlpBridge(
                 mapOf("id" to request.id)
             }
 
+            "convertVideo" -> respond(result) {
+                val request = DownloadRequest(
+                    id = call.requireString("id"),
+                    url = call.requireString("uri"),
+                    formatId = FORMAT_CONVERT,
+                    targetDir = call.requireString("targetDir"),
+                    title = call.argument<String>("title"),
+                    convert = ConvertSpec(
+                        name = call.requireString("name"),
+                        // Only a plain extension: it ends the file's name.
+                        ext = call.requireString("ext").filter(Char::isLetterOrDigit).ifEmpty { "mp4" },
+                        inputArgs = call.argument<List<String>>("inputArgs").orEmpty(),
+                        outputArgs = call.argument<List<String>>("outputArgs").orEmpty(),
+                        durationMs = call.requireLong("durationMs"),
+                    ),
+                )
+                requestDownloadPermissions()
+                withContext(Dispatchers.Main) { DownloadService.start(context, request) }
+                mapOf("id" to request.id)
+            }
+
             "cancelDownload" -> respond(result) {
                 withContext(Dispatchers.Main) {
                     DownloadService.cancel(context, call.requireString("id"))
@@ -424,5 +445,8 @@ class YtDlpBridge(
 
         /** `formatId` recorded for a `fitVideo` job; nothing is downloaded. */
         const val FORMAT_FIT = "fit"
+
+        /** `formatId` recorded for a `convertVideo` job. */
+        const val FORMAT_CONVERT = "convert"
     }
 }

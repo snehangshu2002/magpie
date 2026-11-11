@@ -58,6 +58,8 @@ data class DownloadRequest(
      * video to re-encode, not a link.
      */
     val fit: FitSpec? = null,
+    /** Set for a `convertVideo` job; [url] is the saved video's content URI, as for [fit]. */
+    val convert: ConvertSpec? = null,
 )
 
 /** The video, or every item of a playlist, was already in the download archive. */
@@ -186,6 +188,7 @@ class DownloadService : Service() {
             val fit = task.request.fit
             val files = when {
                 fit != null -> listOf(fitVideo(task, fit, workDir))
+                task.request.convert != null -> listOf(fitVideo(task, null, workDir))
                 task.request.formatId == FORMAT_POST -> downloadPost(task, workDir)
                 task.request.formatId == FORMAT_IMAGES -> downloadImages(task, workDir)
                 task.request.playlist -> downloadPlaylist(task, workDir)
@@ -428,32 +431,34 @@ class DownloadService : Service() {
 
     /**
      * Re-encodes the saved video at [DownloadRequest.url] (a content URI) to
-     * fit [spec]; returns `<name>.mp4`. FFmpeg can't read content URIs, so
+     * fit [spec] (returns `<name>.mp4`), or with no [spec] runs the request's
+     * `convert` job (returns `<name>.<ext>`). FFmpeg can't read content URIs, so
      * the video is copied into [workDir] first.
      */
-    private fun fitVideo(task: DownloadTask, spec: FitSpec, workDir: File): File {
+    private fun fitVideo(task: DownloadTask, spec: FitSpec?, workDir: File): File {
+        val convert = task.request.convert
         val input = File(workDir, "input")
         val source = contentResolver.openInputStream(Uri.parse(task.request.url))
             ?: throw FileNotFoundException(task.request.url)
         source.use { from -> input.outputStream().use { from.copyTo(it) } }
 
-        val name = safeFileName(spec.name).ifBlank { "video" }
-        val output = File(workDir, "$name.mp4")
+        val name = safeFileName(spec?.name ?: convert!!.name).ifBlank { "video" }
+        val output = File(workDir, "$name.${if (spec != null) "mp4" else convert!!.ext}")
+        val onStart = { process: Process ->
+            processes[task.id] = process
+            // Cancelled before FFmpeg started.
+            if (task.cancelRequested) process.destroy()
+        }
+        val onProgress = { percent: Float ->
+            task.percent = percent
+            publish(task)
+        }
         try {
-            VideoFitter(this).fit(
-                input,
-                output,
-                spec,
-                onStart = { process ->
-                    processes[task.id] = process
-                    // Cancelled before FFmpeg started.
-                    if (task.cancelRequested) process.destroy()
-                },
-                onProgress = { percent ->
-                    task.percent = percent
-                    publish(task)
-                },
-            )
+            if (spec != null) {
+                VideoFitter(this).fit(input, output, spec, onStart, onProgress)
+            } else {
+                VideoFitter(this).convert(input, output, convert!!, onStart, onProgress)
+            }
         } finally {
             processes.remove(task.id)
             input.delete()
@@ -516,6 +521,15 @@ class DownloadService : Service() {
                 name = name,
             )
         },
+        convert = getStringExtra(EXTRA_CONVERT_NAME)?.let { name ->
+            ConvertSpec(
+                name = name,
+                ext = getStringExtra(EXTRA_CONVERT_EXT) ?: "mp4",
+                inputArgs = getStringArrayListExtra(EXTRA_CONVERT_INPUT_ARGS).orEmpty(),
+                outputArgs = getStringArrayListExtra(EXTRA_CONVERT_OUTPUT_ARGS).orEmpty(),
+                durationMs = getLongExtra(EXTRA_FIT_DURATION_MS, 0),
+            )
+        },
     )
 
     companion object {
@@ -546,6 +560,10 @@ class DownloadService : Service() {
         private const val EXTRA_FIT_AUDIO_KBPS = "fitAudioKbps"
         private const val EXTRA_FIT_MAX_SHORT_SIDE = "fitMaxShortSide"
         private const val EXTRA_FIT_NAME = "fitName"
+        private const val EXTRA_CONVERT_NAME = "convertName"
+        private const val EXTRA_CONVERT_EXT = "convertExt"
+        private const val EXTRA_CONVERT_INPUT_ARGS = "convertInputArgs"
+        private const val EXTRA_CONVERT_OUTPUT_ARGS = "convertOutputArgs"
 
         private const val TAG = "DownloadService"
 
@@ -601,6 +619,13 @@ class DownloadService : Service() {
                     .putExtra(EXTRA_FIT_AUDIO_KBPS, fit.audioKbps)
                     .putExtra(EXTRA_FIT_MAX_SHORT_SIDE, fit.maxShortSide)
                     .putExtra(EXTRA_FIT_NAME, fit.name)
+            }
+            request.convert?.let { convert ->
+                intent.putExtra(EXTRA_CONVERT_NAME, convert.name)
+                    .putExtra(EXTRA_CONVERT_EXT, convert.ext)
+                    .putStringArrayListExtra(EXTRA_CONVERT_INPUT_ARGS, ArrayList(convert.inputArgs))
+                    .putStringArrayListExtra(EXTRA_CONVERT_OUTPUT_ARGS, ArrayList(convert.outputArgs))
+                    .putExtra(EXTRA_FIT_DURATION_MS, convert.durationMs)
             }
             ContextCompat.startForegroundService(context, intent)
         }

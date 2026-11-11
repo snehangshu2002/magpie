@@ -84,7 +84,7 @@ void main() {
   test('nothing saved yet loads the defaults', () async {
     final s = await repository().load();
 
-    expect(s.themeColor, ThemeColor.sage);
+    expect(s.themeColor, ThemeColor.indigo);
     expect(s.keepHistory, isTrue);
     expect(s.saveFolder, const AppSettings().saveFolder);
   });

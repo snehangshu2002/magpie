@@ -11,11 +11,14 @@ import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/core/widgets/platform_badge.dart';
 import 'package:media_downloader/core/widgets/pressable_scale.dart';
 import 'package:media_downloader/features/fit/presentation/fit_sheet.dart';
+import 'package:media_downloader/features/fit/presentation/video_tools_sheet.dart';
+import 'package:media_downloader/features/image_edit/presentation/image_edit_sheet.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/presentation/library_actions.dart';
 import 'package:media_downloader/features/library/presentation/library_providers.dart';
 import 'package:media_downloader/features/library/presentation/widgets/library_thumbnail.dart';
+import 'package:media_downloader/features/tools/presentation/tool_entry.dart';
 import 'package:media_downloader/l10n/l10n.dart';
 
 extension on LibraryItem {
@@ -27,6 +30,7 @@ extension on LibraryItem {
     },
     OutputType.audio => l10n.outputAudio,
     OutputType.image => l10n.outputImage,
+    OutputType.document => l10n.outputDocument,
   };
 }
 
@@ -34,10 +38,18 @@ extension on LibraryItem {
 /// link or delete it. A long press starts selecting several files; while
 /// [selecting], a tap picks or unpicks the file instead.
 class LibraryTile extends ConsumerWidget {
-  const new({required this.item, this.selecting = false, super.key});
+  const new({
+    required this.item,
+    this.selecting = false,
+    this.grid = false,
+    super.key,
+  });
 
   final LibraryItem item;
   final bool selecting;
+
+  /// A card with a big preview, for the Library's grid; else a row.
+  final bool grid;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +60,11 @@ class LibraryTile extends ConsumerWidget {
       librarySelectionProvider.select((ids) => ids.contains(item.id)),
     );
     final details = [
-      item.platform.label(l10n),
+      // Made by a tool from a file on the phone: there's no site to name.
+      if (item.sourceUrl.isEmpty)
+        l10n.libraryOnPhone
+      else
+        item.platform.label(l10n),
       item.kind(l10n),
       if (item.sizeBytes case final size?) formatByteSize(size, l10n),
     ].join(' · ');
@@ -56,6 +72,105 @@ class LibraryTile extends ConsumerWidget {
     void toggle() {
       unawaited(HapticFeedback.selectionClick());
       ref.read(librarySelectionProvider.notifier).toggle(item.id);
+    }
+
+    if (grid) {
+      return Semantics(
+        selected: selecting ? selected : null,
+        child: PressableScale(
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            color: selected
+                ? scheme.secondaryContainer
+                : scheme.surfaceContainer,
+            child: InkWell(
+              onTap: selecting ? toggle : () => _open(context, ref),
+              onLongPress: toggle,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                          child: LibraryThumbnail(
+                            type: item.type,
+                            fileUri: item.fileUri,
+                            thumbnailUrl: item.thumbnailUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                        ),
+                        Positioned(
+                          left: 14,
+                          bottom: 6,
+                          child: PlatformBadge(
+                            platform: item.platform,
+                            size: 26,
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: selecting
+                              ? Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    selected
+                                        ? Icons.check_circle_rounded
+                                        : Icons.radio_button_unchecked_rounded,
+                                    color: selected
+                                        ? scheme.primary
+                                        : scheme.onSurface,
+                                  ),
+                                )
+                              : IconButton.filledTonal(
+                                  tooltip: l10n.libraryMore,
+                                  visualDensity: VisualDensity.compact,
+                                  icon: const Icon(Icons.more_vert_rounded),
+                                  onPressed: () => _showActions(context, ref),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          [
+                            item.kind(l10n),
+                            if (item.sizeBytes case final size?)
+                              formatByteSize(size, l10n),
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     return Semantics(
@@ -150,6 +265,12 @@ class LibraryTile extends ConsumerWidget {
         await shareLibraryItems(context, ref, [item]);
       case _Action.fit:
         await showFitSheet(context, item);
+      case _Action.videoTools:
+        await showVideoToolsSheet(context, item);
+      case _Action.editImage:
+        await showImageEditSheet(context, [item]);
+      case _Action.pdfTools:
+        await showPdfToolPicker(context, item);
       case _Action.copyLink:
         final messenger = ScaffoldMessenger.of(context);
         final copied = context.l10n.libraryLinkCopied;
@@ -176,7 +297,16 @@ class LibraryTile extends ConsumerWidget {
   }
 }
 
-enum _Action { open, share, fit, copyLink, delete }
+enum _Action {
+  open,
+  share,
+  fit,
+  videoTools,
+  editImage,
+  pdfTools,
+  copyLink,
+  delete,
+}
 
 /// The file at the top, then what can be done with it.
 class _ActionSheet extends StatelessWidget {
@@ -190,9 +320,16 @@ class _ActionSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final details = [
-      [item.kind(l10n), ?item.ext?.toUpperCase()].join(' '),
+      // "PDF" already names the type.
+      if (item.type == OutputType.document)
+        item.kind(l10n)
+      else
+        [item.kind(l10n), ?item.ext?.toUpperCase()].join(' '),
       if (item.sizeBytes case final size?) formatByteSize(size, l10n),
-      item.platform.label(l10n),
+      if (item.sourceUrl.isEmpty)
+        l10n.libraryOnPhone
+      else
+        item.platform.label(l10n),
     ].join(' · ');
     final divider = Divider(
       height: 1,
@@ -268,12 +405,35 @@ class _ActionSheet extends StatelessWidget {
                 subtitle: l10n.fitHint,
                 onTap: () => Navigator.pop(context, _Action.fit),
               ),
-            _ActionTile(
-              icon: Icons.link_rounded,
-              title: l10n.libraryCopyLink,
-              subtitle: l10n.libraryCopyLinkHint(item.platform.label(l10n)),
-              onTap: () => Navigator.pop(context, _Action.copyLink),
-            ),
+            if (item.type == OutputType.video)
+              _ActionTile(
+                icon: Icons.auto_fix_high_rounded,
+                title: l10n.videoToolsTitle,
+                subtitle: l10n.videoToolsHint,
+                onTap: () => Navigator.pop(context, _Action.videoTools),
+              ),
+            if (item.type == OutputType.image)
+              _ActionTile(
+                icon: Icons.photo_size_select_large_rounded,
+                title: l10n.imageEditTitle,
+                subtitle: l10n.imageEditHint,
+                onTap: () => Navigator.pop(context, _Action.editImage),
+              ),
+            if (item.type == OutputType.document)
+              _ActionTile(
+                icon: Icons.picture_as_pdf_outlined,
+                title: l10n.pdfTools,
+                subtitle: l10n.pdfToolsHint,
+                onTap: () => Navigator.pop(context, _Action.pdfTools),
+              ),
+            // A copy of an image shared from another app has no link.
+            if (item.sourceUrl.isNotEmpty)
+              _ActionTile(
+                icon: Icons.link_rounded,
+                title: l10n.libraryCopyLink,
+                subtitle: l10n.libraryCopyLinkHint(item.platform.label(l10n)),
+                onTap: () => Navigator.pop(context, _Action.copyLink),
+              ),
             const SizedBox(height: 8),
             divider,
             const SizedBox(height: 8),

@@ -10,6 +10,7 @@ import 'package:media_downloader/core/platform/storage_channel.dart';
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/fit/domain/fit_plan.dart';
 import 'package:media_downloader/features/fit/domain/fit_repository.dart';
+import 'package:media_downloader/features/fit/domain/video_tool.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -17,6 +18,9 @@ part 'fit_repository_impl.g.dart';
 
 /// `formatId` of a copy's record; nothing was downloaded for it.
 const fitFormatId = 'fit';
+
+/// `formatId` of the record of a file made by a video tool.
+const convertFormatId = 'convert';
 
 class FitRepositoryImpl implements FitRepository {
   new(this._engine, this._storage, this._db);
@@ -73,6 +77,51 @@ class FitRepositoryImpl implements FitRepository {
           title: name,
         ),
       ),
+    );
+    if (result is Err) {
+      await (_db.delete(
+        _db.downloadRecords,
+      )..where((r) => r.id.equals(id))).go();
+    }
+    return result;
+  }
+
+  @override
+  Future<Result<String>> startTool({
+    required String id,
+    required LibraryItem item,
+    required VideoJob job,
+    required String targetDir,
+    required String name,
+  }) async {
+    await _db
+        .into(_db.downloadRecords)
+        .insertOnConflictUpdate(
+          DownloadRecordsCompanion.insert(
+            id: id,
+            url: item.sourceUrl,
+            title: Value(name),
+            formatId: convertFormatId,
+            outputType: job.type.name,
+            state: DownloadState.queued.name,
+            platform: Value(item.platform.name),
+            thumbnail: Value(item.thumbnailUrl),
+            ext: Value(job.ext),
+            quality: Value(job.type == OutputType.video ? item.quality : null),
+          ),
+        );
+    final result = await guardPlatformCall(
+      () => _engine.convertVideo({
+        'id': id,
+        'uri': item.fileUri,
+        'targetDir': targetDir,
+        'name': name,
+        'ext': job.ext,
+        'inputArgs': job.inputArgs,
+        'outputArgs': job.outputArgs,
+        'durationMs': job.durationMs,
+        'title': name,
+      }),
     );
     if (result is Err) {
       await (_db.delete(

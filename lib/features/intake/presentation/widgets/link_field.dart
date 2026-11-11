@@ -51,7 +51,7 @@ class LinkField extends StatelessWidget {
 
     final scheme = theme.colorScheme;
 
-    // A hairline at rest; sage while typing.
+    // A hairline at rest; the accent while typing.
     return ListenableBuilder(
       listenable: focusNode,
       builder: (context, child) => TweenAnimationBuilder<double>(

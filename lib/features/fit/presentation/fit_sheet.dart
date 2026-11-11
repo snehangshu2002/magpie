@@ -10,6 +10,7 @@ import 'package:media_downloader/core/platform/models/video_probe.dart';
 import 'package:media_downloader/core/theme/app_theme.dart';
 import 'package:media_downloader/core/theme/motion.dart';
 import 'package:media_downloader/core/utils/formatters.dart';
+import 'package:media_downloader/core/widgets/sheet_buttons.dart';
 import 'package:media_downloader/features/fit/domain/fit_plan.dart';
 import 'package:media_downloader/features/fit/presentation/fit_providers.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
@@ -20,6 +21,8 @@ import 'package:media_downloader/l10n/l10n.dart';
 Future<void> showFitSheet(BuildContext context, LibraryItem item) =>
     showModalBottomSheet<void>(
       context: context,
+      // Over the navigation bar, not under it.
+      useRootNavigator: true,
       isScrollControlled: true,
       builder: (context) => FitSheet(item: item),
     );
@@ -50,23 +53,23 @@ class _FitSheetState extends ConsumerState<FitSheet> {
     final job = ref.watch(fitJobProvider(item.id));
 
     final body = switch (job) {
-      AsyncError(:final error) => _Failed(
+      AsyncError(:final error) => FitFailed(
         message: error is Failure ? error.message(l10n) : l10n.failureUnknown,
         onRetry: () => ref.read(fitJobProvider(item.id).notifier).reset(),
       ),
       AsyncData(
         value: DownloadProgress(state: DownloadState.saved) && final saved,
       ) =>
-        _Done(
+        FitDone(
           name: _name ?? item.title,
           onShare: () => _shareCopy(saved),
           onClose: () => Navigator.pop(context),
         ),
-      AsyncData(value: final DownloadProgress p) => _Working(
+      AsyncData(value: final DownloadProgress p) => FitWorking(
         progress: p,
         onCancel: () => ref.read(fitJobProvider(item.id).notifier).cancel(),
       ),
-      AsyncLoading() => _Working(
+      AsyncLoading() => FitWorking(
         progress: null,
         onCancel: () => ref.read(fitJobProvider(item.id).notifier).cancel(),
       ),
@@ -116,7 +119,7 @@ class _FitSheetState extends ConsumerState<FitSheet> {
       AsyncData(value: VideoProbe(durationMs: final durationMs?) && final p) =>
         _sizes(p, durationMs),
       AsyncData() => _Note(l10n.fitNoLength),
-      AsyncError(:final error) => _Failed(
+      AsyncError(:final error) => FitFailed(
         message: error is Failure ? error.message(l10n) : l10n.failureUnknown,
         onRetry: () => ref.invalidate(videoProbeProvider(item.fileUri)),
       ),
@@ -190,7 +193,7 @@ class _FitSheetState extends ConsumerState<FitSheet> {
         ),
         const SizedBox(height: 24),
         FilledButton(
-          style: _primaryButton(theme),
+          style: primarySheetButton(theme),
           onPressed: switch (plan) {
             FitEncode() => () => _start(picked, plan, durationMs),
             FitAlreadyFits() => _shareOriginal,
@@ -248,20 +251,6 @@ class _FitSheetState extends ConsumerState<FitSheet> {
     if (await shareLibraryItems(context, ref, [copy])) navigator.pop();
   }
 }
-
-ButtonStyle _primaryButton(ThemeData theme) => FilledButton.styleFrom(
-  minimumSize: const Size.fromHeight(56),
-  shape: const StadiumBorder(),
-  textStyle: theme.textTheme.titleMedium,
-);
-
-ButtonStyle _secondaryButton(ThemeData theme) => FilledButton.styleFrom(
-  minimumSize: const Size.fromHeight(56),
-  shape: const StadiumBorder(),
-  backgroundColor: theme.colorScheme.surfaceContainerLow,
-  foregroundColor: theme.colorScheme.onSurface,
-  textStyle: theme.textTheme.titleMedium,
-);
 
 /// One size: what the copy would be like, or why it can't be made.
 class _SizeRow extends StatelessWidget {
@@ -346,11 +335,19 @@ class _SizeRow extends StatelessWidget {
 }
 
 /// The copy is being made; [progress] is null until the engine reports.
-class _Working extends StatelessWidget {
-  const new({required this.progress, required this.onCancel});
+class FitWorking extends StatelessWidget {
+  const new({
+    required this.progress,
+    required this.onCancel,
+    this.label,
+    super.key,
+  });
 
   final DownloadProgress? progress;
   final VoidCallback onCancel;
+
+  /// What is being made; "Making a smaller copy…" when left out.
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -369,7 +366,10 @@ class _Working extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(l10n.fitWorking, style: theme.textTheme.titleMedium),
+              child: Text(
+                label ?? l10n.fitWorking,
+                style: theme.textTheme.titleMedium,
+              ),
             ),
             if (percent != null)
               Text(
@@ -399,7 +399,7 @@ class _Working extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         FilledButton(
-          style: _secondaryButton(theme),
+          style: secondarySheetButton(theme),
           onPressed: progress == null ? null : onCancel,
           child: Text(l10n.cancel),
         ),
@@ -408,8 +408,13 @@ class _Working extends StatelessWidget {
   }
 }
 
-class _Done extends StatelessWidget {
-  const new({required this.name, required this.onShare, required this.onClose});
+class FitDone extends StatelessWidget {
+  const new({
+    required this.name,
+    required this.onShare,
+    required this.onClose,
+    super.key,
+  });
 
   final String name;
   final VoidCallback onShare;
@@ -441,14 +446,14 @@ class _Done extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         FilledButton.icon(
-          style: _primaryButton(theme),
+          style: primarySheetButton(theme),
           onPressed: onShare,
           icon: const Icon(Icons.share_outlined),
           label: Text(l10n.fitShare),
         ),
         const SizedBox(height: 8),
         FilledButton(
-          style: _secondaryButton(theme),
+          style: secondarySheetButton(theme),
           onPressed: onClose,
           child: Text(l10n.fitClose),
         ),
@@ -457,8 +462,8 @@ class _Done extends StatelessWidget {
   }
 }
 
-class _Failed extends StatelessWidget {
-  const new({required this.message, required this.onRetry});
+class FitFailed extends StatelessWidget {
+  const new({required this.message, required this.onRetry, super.key});
 
   final String message;
   final VoidCallback onRetry;
@@ -478,7 +483,7 @@ class _Failed extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         FilledButton(
-          style: _secondaryButton(theme),
+          style: secondarySheetButton(theme),
           onPressed: onRetry,
           child: Text(context.l10n.fitTryAgain),
         ),

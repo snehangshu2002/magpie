@@ -30,6 +30,12 @@ sealed class Failure with _$Failure implements Exception {
   /// videos already downloaded").
   const factory nothingNew() = NothingNewFailure;
 
+  /// The PDF needs a password, or the one given is wrong.
+  const factory protectedPdf({String? detail}) = ProtectedPdfFailure;
+
+  /// The font can't write some of the letters asked for.
+  const factory unsupportedText({String? detail}) = UnsupportedTextFailure;
+
   /// The native side doesn't implement the call yet (e.g. a feature that
   /// hasn't shipped in this build).
   const factory unavailable({String? detail}) = UnavailableFailure;
