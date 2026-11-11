@@ -1,2 +1,5 @@
-- Magpie is now on F-Droid
-- F-Droid delivers app updates; the download engine still keeps itself up to date
+- New look: indigo colours, a Home screen and a Tools tab
+- PDF tools: merge, compress, split, delete or rotate pages, add text, page numbers or a watermark, lock or unlock with a password, photos to PDF and PDF to photos
+- Photo tools: resize, crop, rotate, compress or convert one photo or many
+- Video tools: save the sound, cut a part, mute, convert to MP4 or make a GIF
+- Library: grid view, sorting and how much space your files use
