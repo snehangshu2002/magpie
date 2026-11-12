@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/pdf/domain/pdf_tool.dart';
 
 /// What a PDF says about itself.
 typedef PdfInfo = ({int? pages, String? name, int? size, bool protected});
+
+/// A page as a picture, with the page's size in points as it is shown.
+typedef PdfPage = ({Uint8List bytes, int width, int height});
 
 /// The choices a [PdfTool] runs with; only the ones it reads matter.
 final class PdfOptions {
@@ -51,6 +56,15 @@ abstract interface class PdfRepository {
   /// Pages, name and size of the PDF at [uri]; `pages` is null when it
   /// needs a password ([password] is tried).
   Future<Result<PdfInfo>> info(String uri, {String? password});
+
+  /// Page [page] (1-based) of the PDF at [uri] as a picture [size] pixels
+  /// on its longest side.
+  Future<Result<PdfPage>> page(
+    String uri,
+    int page, {
+    required int size,
+    String? password,
+  });
 
   /// Runs [tool] over [items] (in order) with [options], saving the result
   /// in [targetDir] as [name]. The files made, in order; empty when

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:media_downloader/core/errors/failure.dart';
 import 'package:media_downloader/core/media/source_platform.dart';
 import 'package:media_downloader/core/platform/models/download_request.dart';
 import 'package:media_downloader/core/utils/result.dart';
@@ -34,6 +35,14 @@ class _FakePdfRepository implements PdfRepository {
     size: 1000,
     protected: pages == null && password != 'secret',
   ));
+
+  @override
+  Future<Result<PdfPage>> page(
+    String uri,
+    int page, {
+    required int size,
+    String? password,
+  }) async => const Err(Failure.unknown());
 
   @override
   Future<Result<List<LibraryItem>>> run({
@@ -117,6 +126,21 @@ void main() {
 
     expect(repository.runs.single.$2.pages, [2, 3]);
     expect(find.text('Ready to share'), findsOneWidget);
+  });
+
+  testWidgets('tapping pages picks them in the pages field', (tester) async {
+    final repository = _FakePdfRepository(5);
+    await _pump(tester, repository, PdfTool.delete);
+    await tester.tap(find.bySemanticsLabel('Page 2'));
+    await tester.tap(find.bySemanticsLabel('Page 3'));
+    await tester.tap(find.bySemanticsLabel('Page 5'));
+    await tester.pump();
+    expect(find.text('2-3, 5'), findsOneWidget);
+    expect(find.bySemanticsLabel('Page 3, picked'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Page 3, picked'));
+    await tester.pump();
+    expect(find.text('2, 5'), findsOneWidget);
   });
 
   testWidgets('deleting every page is refused', (tester) async {

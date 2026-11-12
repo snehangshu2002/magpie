@@ -310,43 +310,63 @@ internal class PdfEditor(private val context: Context, private val workDir: File
     }
 
     /** Each page as a JPEG, about 150 dpi and at most [MAX_RENDER_SIDE] pixels. */
-    private fun toImages(job: PdfJob): List<File> {
-        var input = copyIn(job.uris.single(), "in.pdf")
-        // PdfRenderer takes no password: render a copy without security instead.
-        load(input, job.password).use { doc ->
+    private fun toImages(job: PdfJob): List<File> = openRenderer(plainCopy(job.uris.single(), job.password)).use { renderer ->
+        List(renderer.pageCount) { i ->
+            val bitmap = renderPage(renderer, i) { w, h -> min(RENDER_DPI / 72f, MAX_RENDER_SIDE.toFloat() / max(w, h)) }
+            try {
+                File(workDir, "${job.name} ${i + 1}.jpg").also { file ->
+                    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, job.quality, it) }
+                }
+            } finally {
+                bitmap.recycle()
+            }
+        }
+    }
+
+    /** A copy of the PDF at [uri] in [workDir] that PdfRenderer can open: PdfRenderer takes no password, so a protected one is saved without security. */
+    fun plainCopy(uri: Uri, password: String?): File {
+        var input = copyIn(uri, "in.pdf")
+        load(input, password).use { doc ->
             if (doc.isEncrypted) {
                 doc.isAllSecurityToBeRemoved = true
                 input = File(workDir, "plain.pdf").also { doc.save(it) }
             }
         }
-        val descriptor = ParcelFileDescriptor.open(input, ParcelFileDescriptor.MODE_READ_ONLY)
-        val renderer = try {
-            PdfRenderer(descriptor)
-        } catch (e: SecurityException) {
-            descriptor.close()
-            throw PdfProtectedException("The PDF needs a password", e)
-        }
-        return renderer.use {
-            List(renderer.pageCount) { i ->
-                renderer.openPage(i).use { page ->
-                    val scale = min(RENDER_DPI / 72f, MAX_RENDER_SIDE.toFloat() / max(page.width, page.height))
-                    val bitmap = Bitmap.createBitmap(
-                        (page.width * scale).roundToInt().coerceAtLeast(1),
-                        (page.height * scale).roundToInt().coerceAtLeast(1),
-                        Bitmap.Config.ARGB_8888,
-                    )
-                    try {
-                        bitmap.eraseColor(Color.WHITE)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        File(workDir, "${job.name} ${i + 1}.jpg").also { file ->
-                            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, job.quality, it) }
-                        }
-                    } finally {
-                        bitmap.recycle()
-                    }
-                }
+        return input
+    }
+
+    companion object {
+        /** Inter, bundled with the app for its own text: Latin, Greek and Cyrillic. */
+        private const val FONT_ASSET = "flutter_assets/assets/fonts/Inter-Regular.ttf"
+        private const val POINTS_PER_PIXEL = 72f / 150f
+        private const val A4_MARGIN = 28f
+        private const val TEXT_MARGIN = 28f
+        private const val RENDER_DPI = 150f
+        const val MAX_RENDER_SIDE = 2500
+
+        fun openRenderer(file: File): PdfRenderer {
+            val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            return try {
+                PdfRenderer(descriptor)
+            } catch (e: SecurityException) {
+                descriptor.close()
+                throw PdfProtectedException("The PDF needs a password", e)
             }
         }
+
+        /** Page [index] on white, [scale] pixels per point (from the page's size in points). */
+        fun renderPage(renderer: PdfRenderer, index: Int, scale: (Int, Int) -> Float): Bitmap =
+            renderer.openPage(index).use { page ->
+                val s = scale(page.width, page.height)
+                Bitmap.createBitmap(
+                    (page.width * s).roundToInt().coerceAtLeast(1),
+                    (page.height * s).roundToInt().coerceAtLeast(1),
+                    Bitmap.Config.ARGB_8888,
+                ).apply {
+                    eraseColor(Color.WHITE)
+                    page.render(this, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                }
+            }
     }
 
     /** Loads [PdfJob.uris]'s one PDF, lets [change] return the document to save, and saves it. */
@@ -399,14 +419,4 @@ internal class PdfEditor(private val context: Context, private val workDir: File
     }
 
     private fun output(job: PdfJob) = File(workDir, "${job.name}.pdf")
-
-    private companion object {
-        /** Inter, bundled with the app for its own text: Latin, Greek and Cyrillic. */
-        const val FONT_ASSET = "flutter_assets/assets/fonts/Inter-Regular.ttf"
-        const val POINTS_PER_PIXEL = 72f / 150f
-        const val A4_MARGIN = 28f
-        const val TEXT_MARGIN = 28f
-        const val RENDER_DPI = 150f
-        const val MAX_RENDER_SIDE = 2500
-    }
 }

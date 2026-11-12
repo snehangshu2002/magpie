@@ -57,9 +57,16 @@ enum CropShape {
   final double? ratio;
 }
 
-/// The biggest [shape] rectangle in the middle of a [width] x [height]
-/// image; null when nothing is cut off.
-ImageCrop? centeredCrop(int width, int height, CropShape shape) {
+/// The biggest [shape] rectangle of a [width] x [height] image; null when
+/// nothing is cut off. [x] and [y] (0–1) place it: 0 at the left or top
+/// edge, 0.5 in the middle, 1 at the right or bottom.
+ImageCrop? centeredCrop(
+  int width,
+  int height,
+  CropShape shape, {
+  double x = 0.5,
+  double y = 0.5,
+}) {
   final ratio = shape.ratio;
   if (ratio == null) return null;
   var w = width;
@@ -71,5 +78,10 @@ ImageCrop? centeredCrop(int width, int height, CropShape shape) {
   w = w.clamp(1, width);
   h = h.clamp(1, height);
   if (w == width && h == height) return null;
-  return (left: (width - w) ~/ 2, top: (height - h) ~/ 2, width: w, height: h);
+  return (
+    left: ((width - w) * x.clamp(0, 1)).floor(),
+    top: ((height - h) * y.clamp(0, 1)).floor(),
+    width: w,
+    height: h,
+  );
 }

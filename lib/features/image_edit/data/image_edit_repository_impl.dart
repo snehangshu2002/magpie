@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/services.dart';
 import 'package:media_downloader/core/db/app_database.dart';
 import 'package:media_downloader/core/errors/platform_failure.dart';
 import 'package:media_downloader/core/platform/models/download_progress.dart';
@@ -28,6 +29,17 @@ class ImageEditRepositoryImpl implements ImageEditRepository {
   @override
   Future<Result<({int width, int height})>> probe(String fileUri) =>
       guardPlatformCall(() => _storage.probeImage(fileUri));
+
+  @override
+  Future<Uint8List?> preview(String fileUri, {int size = 720}) async {
+    try {
+      return await _storage.thumbnail(fileUri, size: size);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
 
   @override
   Future<Result<LibraryItem>> edit({

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:media_downloader/core/utils/result.dart';
 import 'package:media_downloader/features/image_edit/domain/image_plan.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
@@ -10,6 +12,10 @@ abstract interface class ImageEditRepository {
 
   /// Width and height in pixels of the image at [fileUri], as it is shown.
   Future<Result<({int width, int height})>> probe(String fileUri);
+
+  /// A JPEG of the image at [fileUri] about [size] pixels across, upright;
+  /// null when it can't be shown.
+  Future<Uint8List?> preview(String fileUri, {int size = 720});
 
   /// Saves a copy of [item] in [targetDir] as [name], [width] x [height]
   /// pixels in [format] at [quality] (1-100), no bigger than [targetBytes]

@@ -34,6 +34,17 @@ void main() {
     expect(centeredCrop(500, 500, CropShape.square), isNull);
   });
 
+  test('the crop can be moved to an edge', () {
+    expect(centeredCrop(4000, 3000, CropShape.square, x: 0), (
+      left: 0,
+      top: 0,
+      width: 3000,
+      height: 3000,
+    ));
+    expect(centeredCrop(4000, 3000, CropShape.square, x: 1, y: 1)?.left, 1000);
+    expect(centeredCrop(4000, 3000, CropShape.square, x: 7)?.left, 1000);
+  });
+
   test('other formats are copied as JPEG', () {
     expect(ImageFormat.fromExt('PNG'), ImageFormat.png);
     expect(ImageFormat.fromExt('webp'), ImageFormat.webp);

@@ -14,9 +14,11 @@ import 'package:media_downloader/features/download/domain/save_location.dart';
 import 'package:media_downloader/features/library/data/library_repository_impl.dart';
 import 'package:media_downloader/features/library/domain/library_item.dart';
 import 'package:media_downloader/features/library/presentation/library_actions.dart';
+import 'package:media_downloader/features/library/presentation/library_providers.dart';
 import 'package:media_downloader/features/pdf/data/pdf_repository_impl.dart';
 import 'package:media_downloader/features/pdf/domain/pdf_repository.dart';
 import 'package:media_downloader/features/pdf/domain/pdf_tool.dart';
+import 'package:media_downloader/features/pdf/presentation/pdf_page_preview.dart';
 import 'package:media_downloader/features/pdf/presentation/pdf_providers.dart';
 import 'package:media_downloader/features/settings/presentation/settings_providers.dart';
 import 'package:media_downloader/l10n/l10n.dart';
@@ -263,6 +265,23 @@ class _PdfToolSheetState extends ConsumerState<PdfToolSheet> {
               ),
             ),
           ),
+        if (pageCount != null && !_tool.takesMany) ...[
+          PdfPageGrid(
+            uri: _items.first.fileUri,
+            password: _openedWith,
+            pageCount: pageCount,
+            lookOf: (page) => _lookOf(page, picked ?? const []),
+            onTap: _tool.takesPages ? (page) => _toggle(page, pageCount) : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _tool.takesPages ? l10n.pdfPreviewPickHint : l10n.pdfPreviewHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
         ...switch (_tool) {
           PdfTool.merge || PdfTool.fromImages => [
             SectionLabel(l10n.pdfOrder),
@@ -372,6 +391,49 @@ class _PdfToolSheetState extends ConsumerState<PdfToolSheet> {
       ],
     );
   }
+
+  /// How [page] looks with the choices so far; [picked] are the pages typed
+  /// or tapped.
+  PageLook _lookOf(int page, List<int> picked) {
+    final isPicked = picked.contains(page);
+    // Rotate and add text work on every page until some are picked.
+    final affected = picked.isEmpty || isPicked;
+    return (
+      picked: isPicked && _tool != PdfTool.delete,
+      removed: isPicked && _tool == PdfTool.delete,
+      faded:
+          (_tool == PdfTool.delete && isPicked) ||
+          (_tool == PdfTool.extract && picked.isNotEmpty && !isPicked),
+      quarterTurns: _tool == PdfTool.rotate && affected ? _degrees ~/ 90 : 0,
+      stamp: _tool == PdfTool.addText && affected && _stampText.isNotEmpty
+          ? (
+              text: _stampText,
+              place: _mode == TextMode.watermark ? TextPlace.center : _place,
+              fontSize: _size,
+              diagonal: _mode == TextMode.watermark,
+            )
+          : null,
+    );
+  }
+
+  /// Picks [page] or lets it go, by rewriting the pages field.
+  void _toggle(int page, int pageCount) {
+    unawaited(HapticFeedback.selectionClick());
+    final pages = {...?parsePageRange(_pages.text, pageCount)};
+    if (!pages.remove(page)) pages.add(page);
+    setState(() => _pages.text = formatPageRange(pages));
+  }
+
+  static const _numberStyles = ['{n}', '{page} {n}', '{n} / {total}'];
+
+  /// What [PdfTool.addText] writes: the text typed or a page number style.
+  String get _stampText => switch (_mode) {
+    TextMode.pageNumbers => _numberStyles[_numberStyle].replaceAll(
+      '{page}',
+      context.l10n.pdfPageWord,
+    ),
+    _ => _text.text.trim(),
+  };
 
   List<Widget> _textOptions(Widget pageField) {
     final l10n = context.l10n;
@@ -485,16 +547,19 @@ class _PdfToolSheetState extends ConsumerState<PdfToolSheet> {
           for (final (i, item) in _items.indexed)
             ListTile(
               dense: true,
-              leading: CircleAvatar(
-                radius: 14,
-                backgroundColor: scheme.primaryContainer,
-                child: Text(
+              leading: Badge(
+                label: Text(
                   '${i + 1}',
-                  style: TextStyle(
-                    color: scheme.onPrimaryContainer,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                  style: const TextStyle(
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
+                alignment: AlignmentDirectional.bottomEnd,
+                backgroundColor: scheme.primary,
+                textColor: scheme.onPrimary,
+                child: _fromImages
+                    ? _PhotoPage(uri: item.fileUri, a4: _a4)
+                    : PdfFirstPage(uri: item.fileUri),
               ),
               title: _fromImages
                   ? Text(item.title, maxLines: 1)
@@ -553,14 +618,7 @@ class _PdfToolSheetState extends ConsumerState<PdfToolSheet> {
     final name = _fromImages
         ? l10n.pdfFromImagesName
         : (suffix == null ? base : l10n.fitCopyTitle(base, suffix));
-    final text = switch (_mode) {
-      TextMode.pageNumbers => [
-        '{n}',
-        '${l10n.pdfPageWord} {n}',
-        '{n} / {total}',
-      ][_numberStyle],
-      _ => _text.text.trim(),
-    };
+    final text = _stampText;
 
     final folder = (await ref.read(settingsProvider.future)).saveFolder;
     final result = await ref
@@ -742,6 +800,39 @@ class _PdfToolSheetState extends ConsumerState<PdfToolSheet> {
     decoration: _field(label, error: error),
     onChanged: (_) => setState(() {}),
   );
+}
+
+/// A photo as its page will look: the photo itself, or centred on A4.
+class _PhotoPage extends ConsumerWidget {
+  const new({required this.uri, required this.a4});
+
+  final String uri;
+  final bool a4;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytes = ref.watch(libraryThumbnailProvider(uri)).value;
+    final photo = bytes == null
+        ? Icon(
+            Icons.image_outlined,
+            size: 20,
+            color: Theme.of(context).colorScheme.outline,
+          )
+        : Image.memory(bytes, fit: a4 ? BoxFit.contain : BoxFit.cover);
+    return AnimatedContainer(
+      duration: AppMotion.durationOf(context),
+      curve: AppMotion.standard,
+      width: a4 ? 36 : 48,
+      height: 48,
+      padding: EdgeInsets.all(a4 ? 3 : 0),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(a4 ? 4 : 8),
+      ),
+      child: photo,
+    );
+  }
 }
 
 /// A PDF's file name, or "PDF" until it's known.

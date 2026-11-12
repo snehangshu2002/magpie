@@ -26,4 +26,11 @@ void main() {
     expect(pagesFor(PdfTool.extract, [5, 1, 3], 5), [1, 3, 5]);
     expect(pagesFor(PdfTool.rotate, [3, 1], 5), [3, 1]);
   });
+
+  test('writes picked pages short, and reads them back', () {
+    expect(formatPageRange([5, 1, 3, 2, 9, 8]), '1-3, 5, 8-9');
+    expect(formatPageRange([4, 4]), '4');
+    expect(formatPageRange([]), '');
+    expect(parsePageRange(formatPageRange([7, 1, 2, 3]), 10), [1, 2, 3, 7]);
+  });
 }

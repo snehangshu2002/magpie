@@ -78,6 +78,9 @@ class _ImageEditSheetState extends ConsumerState<ImageEditSheet> {
   var _rotate = 0;
   CropShape _shape = CropShape.original;
 
+  /// Where the crop sits, 0–1 across and down; the user drags it.
+  var _focus = const Offset(0.5, 0.5);
+
   /// Size of the copies of several images, as a share of each one's own.
   var _percent = 100;
 
@@ -178,38 +181,114 @@ class _ImageEditSheetState extends ConsumerState<ImageEditSheet> {
     );
   }
 
-  /// The picture as its copy will be shaped: turned and cut.
-  Widget _preview(_Size shaped) {
-    final bytes = ref.watch(libraryThumbnailProvider(items.first.fileUri));
-    final image = bytes.value;
+  /// The picture as its copy will be shaped: turned and cut. Dragging it
+  /// moves the crop when part of it is cut off.
+  Widget _preview(_Size source, _Size shaped) {
+    final uri = items.first.fileUri;
+    final image =
+        ref.watch(imagePreviewProvider(uri)).value ??
+        ref.watch(libraryThumbnailProvider(uri)).value;
     if (image == null) return const SizedBox.shrink();
+    final turned = _rotate % 180 == 0
+        ? source
+        : (width: source.height, height: source.width);
+    final cut = _shape != CropShape.original;
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
-      child: SizedBox(
-        height: 180,
-        child: Center(
-          child: AnimatedSize(
-            duration: AppMotion.durationOf(context),
-            curve: AppMotion.standard,
-            child: AspectRatio(
-              aspectRatio: shaped.width / shaped.height,
-              child: ClipPath(
-                clipper: ShapeBorderClipper(shape: AppTheme.shape(16)),
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: RotatedBox(
-                    quarterTurns: _rotate ~/ 90,
-                    child: Image.memory(image, gaplessPlayback: true),
-                  ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 240,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: shaped.width / shaped.height,
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    // How far the picture reaches past the frame, in pixels
+                    // on screen.
+                    final scale = max(
+                      box.maxWidth / turned.width,
+                      box.maxHeight / turned.height,
+                    );
+                    final spareX = turned.width * scale - box.maxWidth;
+                    final spareY = turned.height * scale - box.maxHeight;
+                    return GestureDetector(
+                      onPanUpdate: cut
+                          ? (d) => setState(
+                              () => _focus = Offset(
+                                spareX < 1
+                                    ? 0.5
+                                    : (_focus.dx - d.delta.dx / spareX).clamp(
+                                        0,
+                                        1,
+                                      ),
+                                spareY < 1
+                                    ? 0.5
+                                    : (_focus.dy - d.delta.dy / spareY).clamp(
+                                        0,
+                                        1,
+                                      ),
+                              ),
+                            )
+                          : null,
+                      child: _Shaped(
+                        image: image,
+                        rotate: _rotate,
+                        alignment: Alignment(
+                          _focus.dx * 2 - 1,
+                          _focus.dy * 2 - 1,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
           ),
-        ),
+          if (cut) ...[
+            const SizedBox(height: 8),
+            Text(
+              context.l10n.imageCropDragHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
+
+  /// Several pictures, each as its copy will be shaped.
+  Widget _strip() => Padding(
+    padding: const EdgeInsets.only(bottom: 20),
+    child: SizedBox(
+      height: 96,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final image = ref
+              .watch(libraryThumbnailProvider(items[i].fileUri))
+              .value;
+          if (image == null) {
+            return AspectRatio(
+              aspectRatio: _shape.ratio ?? 1,
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+            );
+          }
+          final picture = _Shaped(image: image, rotate: _rotate);
+          return switch (_shape.ratio) {
+            final ratio? => AspectRatio(aspectRatio: ratio, child: picture),
+            null => picture,
+          };
+        },
+      ),
+    ),
+  );
 
   /// [source] is the one picture's size; null when there are several.
   Widget _options(_Size? source) {
@@ -241,6 +320,7 @@ class _ImageEditSheetState extends ConsumerState<ImageEditSheet> {
       unawaited(HapticFeedback.selectionClick());
       setState(() {
         change();
+        _focus = const Offset(0.5, 0.5);
         _width.clear();
         _height.clear();
       });
@@ -297,7 +377,10 @@ class _ImageEditSheetState extends ConsumerState<ImageEditSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (shaped != null) _preview(shaped),
+        if (source != null && shaped != null)
+          _preview(source, shaped)
+        else
+          _strip(),
         SectionLabel(l10n.imageShapeLabel),
         const SizedBox(height: 8),
         Wrap(
@@ -474,7 +557,13 @@ class _ImageEditSheetState extends ConsumerState<ImageEditSheet> {
         final turned = _rotate % 180 == 0
             ? source
             : (width: source.height, height: source.width);
-        final crop = centeredCrop(turned.width, turned.height, _shape);
+        final crop = centeredCrop(
+          turned.width,
+          turned.height,
+          _shape,
+          x: _focus.dx,
+          y: _focus.dy,
+        );
         final shaped = _shaped(source);
         final out =
             size ??
@@ -628,4 +717,31 @@ class _ImageEditSheetState extends ConsumerState<ImageEditSheet> {
   static String _newId() =>
       [for (var i = 0; i < 16; i++) _random.nextInt(16).toRadixString(16)]
           .join();
+}
+
+/// [image] turned [rotate] degrees and cut to fill its box at [alignment].
+class _Shaped extends StatelessWidget {
+  const new({
+    required this.image,
+    required this.rotate,
+    this.alignment = Alignment.center,
+  });
+
+  final Uint8List image;
+  final int rotate;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) => ClipPath(
+    clipper: ShapeBorderClipper(shape: AppTheme.shape(16)),
+    child: FittedBox(
+      fit: BoxFit.cover,
+      alignment: alignment,
+      clipBehavior: Clip.hardEdge,
+      child: RotatedBox(
+        quarterTurns: rotate ~/ 90,
+        child: Image.memory(image, gaplessPlayback: true),
+      ),
+    ),
+  );
 }

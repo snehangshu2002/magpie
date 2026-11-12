@@ -50,6 +50,7 @@ class StorageBridge(
     // Tells Dart that shared storage changed (a file added, edited or deleted
     // by any app), so the Library can re-check its files. Set while Dart listens.
     private var observer: ContentObserver? = null
+    private val pdfPreviews = PdfPreviews(context)
 
     fun attach(messenger: BinaryMessenger) {
         channel = MethodChannel(messenger, CHANNEL).also { it.setMethodCallHandler(this) }
@@ -63,6 +64,7 @@ class StorageBridge(
         changesChannel = null
         onCancel(null)
         scope.cancel()
+        pdfPreviews.close()
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
@@ -152,6 +154,15 @@ class StorageBridge(
 
             "editPdf" -> respond(result) { editPdf(call) }
 
+            "pdfPage" -> respond(result) {
+                pdfPreviews.page(
+                    uri = Uri.parse(call.requireString("uri")),
+                    password = call.argument("password"),
+                    page = call.argument<Int>("page") ?: 1,
+                    size = call.argument<Int>("size") ?: 256,
+                )
+            }
+
             "probeImage" -> respond(result) {
                 ImageEditor.probe(context, Uri.parse(call.requireString("uri")))
             }
@@ -215,11 +226,24 @@ class StorageBridge(
         true // There, just not ours to read.
     }
 
-    /** A JPEG preview of a video or image (or an audio file's cover art); null if there is none. */
+    /**
+     * A JPEG preview of a video or image (or an audio file's cover art); null
+     * if there is none. Images the system can't preview (below API 29, some
+     * picked files) are decoded instead.
+     */
     private fun thumbnail(uri: Uri, size: Int): ByteArray? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || uri.scheme != "content") return null
-        val bitmap = try {
-            context.contentResolver.loadThumbnail(uri, Size(size, size), null)
+        val system = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
+            try {
+                context.contentResolver.loadThumbnail(uri, Size(size, size), null)
+            } catch (_: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+        val bitmap = system ?: try {
+            if (context.contentResolver.getType(uri)?.startsWith("image/") != true) return null
+            ImageEditor.decodeUpright(context, uri, size)
         } catch (_: Exception) {
             return null
         }

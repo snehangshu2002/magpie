@@ -102,7 +102,7 @@ lib/
     download/                  # fetchInfo preview, full-size photos yt-dlp misses (X, image links), suggested options, format picker, playlists (playlist_options), trim (ClipSelection), Settings -> yt-dlp args (download_args), download progress
     library/                   # in-progress + saved files (drift + app/storage), filters/search, sort (`LibrarySort`), rows or a grid of previews (`libraryViewProvider`), storage per site (`storageBySite`), open/share/fit for sharing/copy link/delete, long-press multi-select (share/delete), sync
     image_edit/                # "Resize or convert": rotated, cropped, resized, recompressed or converted copies of one or several images (scaledSize, centeredCrop, ImageFormat), sheet from the Library's file menu, the Tools tab or an image shared to the app
-    pdf/                       # PDF tools (PdfTool, parsePageRange, pagesFor): photos to PDF, merge, compress, split/delete/rotate pages, add text/page numbers/watermark, lock/unlock, pages to photos; one sheet (PdfToolSheet)
+    pdf/                       # PDF tools (PdfTool, parsePageRange, formatPageRange, pagesFor); the sheet shows the pages (PdfPageGrid: tap to pick, which rewrites the pages field; touch and hold to zoom; rotation, removed pages and text drawn live) and first pages / photos in the order list: photos to PDF, merge, compress, split/delete/rotate pages, add text/page numbers/watermark, lock/unlock, pages to photos; one sheet (PdfToolSheet)
     tools/                     # Tools tab (ToolsScreen) and ToolEntry/ToolCard/ToolGrid/launchTool (pick files, open the tool), also used on Home and in a PDF's Library menu
     fit/                       # "Fit for sharing": smaller copies of saved videos under a size (planFit), and "Video tools" (planVideoJob: sound only, cut a part, no sound, MP4, GIF); sheets from the Library's file menu
     settings/                  # appearance (theme, font, colour (`ThemeColor` swatches), wallpaper colours, pure black), downloads, saved files (audio format, cover art, subtitles, SponsorBlock, MKV), accounts (sign-ins), advanced (speed limit, proxy, file names, extra options), updates, about
@@ -129,6 +129,7 @@ android/app/src/main/kotlin/com/snehangshu/magpie/
   storage/MediaStoreSaver.kt   # copies the finished file into Download/ (MediaStore, legacy dir < API 29)
   storage/StorageBridge.kt     # app/storage handlers
   storage/ImageEditor.kt       # decodes, rotates, scales and re-encodes an image (Bitmap; JVM-tested quality search)
+  storage/PdfPreviews.kt       # pdfPage: page pictures for the PDF tools' preview grid
   storage/PdfEditor.kt         # editPdf/pdfInfo: pdfbox-android (merge, pages, text, passwords, smaller pictures) + PdfRenderer (pages as JPGs)
   share/ShareBridge.kt         # app/share: SEND text or one image (its URI), kept until Dart listens
   AppearanceBridge.kt          # app/appearance: UiModeManager.setApplicationNightMode (API 31+)
@@ -307,7 +308,7 @@ Second channel, `app/storage` (saved files, by content URI):
 | Method | Args | Returns |
 |---|---|---|
 | `queryFiles` | `{uris: [..]}` | `[{uri, name?, size?, mimeType?}]` for those that still exist (MediaStore row present, not in the trash (`IS_TRASHED`, API 30+), and the file opens) |
-| `thumbnail` | `{uri, size}` | JPEG bytes or null (API 29+ only) |
+| `thumbnail` | `{uri, size}` | JPEG bytes or null (`loadThumbnail` on API 29+; images it can't do, or below API 29, are decoded upright instead) |
 | `openFile` | `{uri, mimeType?}` | – (`NOT_FOUND`, `NO_APP`) |
 | `shareFiles` | `{uris: [..], mimeType?, title?}` | – (`NOT_FOUND` if none exist, `NO_APP`). Missing ones are left out; one file → `ACTION_SEND`, several → `ACTION_SEND_MULTIPLE`; Dart picks one MIME type for all (`sharedMimeType`) |
 | `deleteFiles` | `{uris: [..]}` | `[uri]` now gone. Files the app no longer owns need consent: one system prompt for all on API 30+, one each on API 29; declined ones are left out |
@@ -315,6 +316,7 @@ Second channel, `app/storage` (saved files, by content URI):
 | `saveText` | `{name, text, targetDir}` | content URI of `<targetDir>/<name>.txt` (saved like a download; asks for `WRITE_EXTERNAL_STORAGE` below API 29, `STORAGE` if denied) |
 | `pickFiles` | `{mimeType, multiple}` | `[uri]` of the files picked in Android's picker (`ACTION_GET_CONTENT`, e.g. `image/*`, `application/pdf`; `EXTRA_ALLOW_MULTIPLE`); empty if backed out (`NO_APP`) |
 | `pdfInfo` | `{uri, password?}` | `{pages?, name?, size?, protected}`; `pages` null (and `protected` true) when it needs a password and `password` doesn't open it |
+| `pdfPage` | `{uri, page, size, password?}` | `{bytes, width, height}`: page `page` (1-based) as a JPEG `size` px on its longest side, and its size in points as shown (`PdfPreviews`: the last PDF stays open, copied once to `cacheDir/pdf-preview` without security, deleted on the next PDF or `detach`; renders one at a time). `PROTECTED` if `password` doesn't open it |
 | `editPdf` | `{op, uris, targetDir, name, pages?, degrees, text, place, fontSize, opacity, diagonal, password?, quality, maxSide, pageSize}` | `{uris, sizes}` of what it saved, in order (see below) |
 | `probeImage` | `{uri}` | `{width, height}` as shown (after EXIF rotation). `NOT_FOUND` if gone, `STORAGE` if unreadable |
 | `editImage` | `{uri, targetDir, name, format, width, height, quality, targetBytes?, rotate?, crop?}` | `{uri, size}` of the copy `<targetDir>/<name>.<format>` (`jpg`\|`png`\|`webp`), scaled to `width`x`height` at `quality` (1–100). With `targetBytes`, native lowers quality (`ImageEditor.bestQuality`, never below 10; PNG has none) and then the pixels (×¾ a round) until it fits, else `TOO_LARGE`. First the image is turned `rotate` degrees clockwise (0/90/180/270, on top of its EXIF rotation) and cut to `crop` (`[left, top, width, height]` in the turned image's pixels). The copy is redrawn from the pixels, so it has no EXIF (location, camera) |
@@ -325,8 +327,10 @@ menu for images, from
 the Tools tab (`ToolEntry.editPhotos`), whose card calls `pickFiles`, and from the
 Library's selection bar when only images are picked) calls these directly,
 with no service job: Dart decides the rotation, the crop (`centeredCrop`
-of a `CropShape`: full, 1:1, 4:5, 16:9, 9:16, always from the middle; the
-sheet previews it on the file's thumbnail), the size (`scaledSize`: typing
+of a `CropShape`: full, 1:1, 4:5, 16:9, 9:16, placed by `x`/`y` (0–1,
+middle by default); the sheet previews it on a 720 px `thumbnail`
+(`imagePreviewProvider`) and the user drags the picture to move the crop
+(one image only; a batch shows a strip of previews, cut from the middle)), the size (`scaledSize`: typing
 one side sets the other; never upscaled), format (`ImageFormat`) and
 quality. Several images at once get the same shape, a percentage of their
 own size and the same format, one `editImage` call each. It saves next to the original

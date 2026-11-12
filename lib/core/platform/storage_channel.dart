@@ -113,6 +113,30 @@ class StorageChannel {
     );
   }
 
+  /// Page [page] (1-based) of the PDF at [uri] as a JPEG [size] pixels on
+  /// its longest side, and the page's size in points as it is shown;
+  /// `PROTECTED` when [password] doesn't open it.
+  Future<({Uint8List bytes, int width, int height})> pdfPage(
+    String uri, {
+    required int page,
+    required int size,
+    String? password,
+  }) async {
+    final reply = jsonMap(
+      await _methods.invokeMethod<Object?>('pdfPage', {
+        'uri': uri,
+        'page': page,
+        'size': size,
+        'password': password,
+      }),
+    );
+    return (
+      bytes: reply['bytes'] as Uint8List,
+      width: reply['width'] as int,
+      height: reply['height'] as int,
+    );
+  }
+
   /// Runs a PDF tool (`op` and its arguments, see CLAUDE.md) and saves what
   /// it made in `targetDir`; the files' content URIs and sizes, in order.
   Future<({List<String> uris, List<int> sizes})> editPdf(

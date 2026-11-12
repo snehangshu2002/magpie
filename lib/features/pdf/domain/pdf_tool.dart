@@ -107,6 +107,21 @@ List<int>? parsePageRange(String text, int pageCount) {
   return pages;
 }
 
+/// [pages] written short, the way [parsePageRange] reads them: sorted, with
+/// runs joined ("1-3, 5").
+String formatPageRange(Iterable<int> pages) {
+  final sorted = pages.toSet().toList()..sort();
+  final parts = <String>[];
+  for (var i = 0; i < sorted.length; i++) {
+    final from = sorted[i];
+    while (i + 1 < sorted.length && sorted[i + 1] == sorted[i] + 1) {
+      i++;
+    }
+    parts.add(from == sorted[i] ? '$from' : '$from-${sorted[i]}');
+  }
+  return parts.join(', ');
+}
+
 /// The pages a [tool] keeps or works on: for [PdfTool.delete] every page
 /// not in [picked]; for the others [picked] itself (for [PdfTool.extract],
 /// in page order). Null when nothing would be left.

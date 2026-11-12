@@ -39,6 +39,16 @@ class PdfRepositoryImpl implements PdfRepository {
       guardPlatformCall(() => _storage.pdfInfo(uri, password: password));
 
   @override
+  Future<Result<PdfPage>> page(
+    String uri,
+    int page, {
+    required int size,
+    String? password,
+  }) => guardPlatformCall(
+    () => _storage.pdfPage(uri, page: page, size: size, password: password),
+  );
+
+  @override
   Future<Result<List<LibraryItem>>> run({
     required PdfTool tool,
     required List<LibraryItem> items,
